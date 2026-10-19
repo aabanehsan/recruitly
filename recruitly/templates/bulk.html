@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "_macros.html" import photo %}
+{% block title %}Bulk headshots{% endblock %}
+{% block content %}
+<h1>Bulk headshot upload</h1>
+<p class="sub">Upload a .zip of photos and each one gets matched to the right applicant.</p>
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+
+<div class="two">
+  <form class="panel" method="post" action="/headshots-bulk" enctype="multipart/form-data">
+    <h2>Upload a .zip</h2>
+    <ol class="steps">
+      <li>In Google Drive, find the folder your form saved uploads to (usually <b>&lt;Form name&gt; (File responses)</b>).</li>
+      <li>Right-click it and choose <b>Download</b>. Drive gives you a .zip.</li>
+      <li>Upload the zip here.</li>
+    </ol>
+    <div style="margin-top:14px"><input type="file" name="file" accept=".zip,application/zip" required aria-label="Zip file"></div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-weight:500">
+      <input type="checkbox" name="overwrite" value="1" style="width:auto"> Replace headshots people already have
+    </label>
+    <div class="actions"><button class="btn primary" type="submit">Match headshots</button></div>
+  </form>
+  <div class="panel">
+    <h2>How matching works</h2>
+    <p class="sample">Google Forms names uploaded files like <code>IMG_2041 - Jordan Lee.jpg</code>, so files are matched by the person's name. A file is also matched if its name contains someone's email username or UT EID. If two people could match a file equally well, it's skipped so nobody gets the wrong photo.</p>
+  </div>
+</div>
+
+{% if result %}
+<hr>
+<div class="stats">
+  <div class="stat"><b>{{ result.saved|length }}</b><span>headshots saved</span></div>
+  <div class="stat"><b>{{ result.unmatched|length }}</b><span>files not matched</span></div>
+  <div class="stat"><b>{{ result.missing|length }}</b><span>applicants still missing one</span></div>
+</div>
+{% if result.saved %}
+<div class="tablewrap" style="margin-bottom:18px">
+  <table><thead><tr><th></th><th>Applicant</th><th>File</th></tr></thead><tbody>
+  {% for ap, fname in result.saved %}
+    <tr><td style="width:56px">{{ photo(ap, small=True) }}</td><td><a href="/applicants/{{ ap.id }}">{{ ap.display_name }}</a></td><td class="sample">{{ fname }}</td></tr>
+  {% endfor %}
+  </tbody></table>
+</div>
+{% endif %}
+{% if result.unmatched %}
+<div class="panel" style="margin-bottom:18px"><h2>Not matched</h2><p class="sample">{{ result.unmatched|join(', ') }}</p>
+<p class="sample">Upload these one at a time from each person's profile page.</p></div>
+{% endif %}
+{% for f in result.failed %}<div class="flash err">{{ f }}</div>{% endfor %}
+{% if result.missing %}
+<div class="panel"><h2>Still missing a headshot</h2>
+<p class="sample">{% for ap in result.missing %}<a href="/applicants/{{ ap.id }}">{{ ap.display_name }}</a>{{ ', ' if not loop.last }}{% endfor %}</p></div>
+{% endif %}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ settings.org_name }}{% endblock %} · Recruitly</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='4' fill='%23b4532a'/></svg>">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><span class="dot"></span>{{ settings.org_name }} <small>{{ settings.cycle_name }}</small></a>
+    {% set path = request.url.path %}
+    <nav class="nav">
+      <a href="/" class="{{ 'on' if path == '/' or path.startswith('/applicants/') and not path.endswith('/new') }}">Applicants</a>
+      <a href="/import" class="{{ 'on' if path.startswith('/import') }}">Import</a>
+      <a href="/headshots-bulk" class="{{ 'on' if path.startswith('/headshots-bulk') }}">Headshots</a>
+      <a href="/applicants/new" class="{{ 'on' if path == '/applicants/new' }}">Add</a>
+    </nav>
+  </div>
+</header>
+<main>
+  <div class="wrap">
+    {% if msg %}<div class="flash">{{ msg }}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </div>
+</main>
+</body>
+</html>

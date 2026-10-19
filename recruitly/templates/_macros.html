@@ -1,0 +1,22 @@
+{% macro photo(ap, cls="photo", small=False) -%}
+  {%- if ap.headshot_path -%}
+    <img class="{{ cls }}" src="/headshots/{{ ap.headshot_path }}" alt="Headshot of {{ ap.display_name }}" loading="lazy"
+         {% if small %}style="width:40px;height:40px;border-radius:50%;object-fit:cover"{% endif %}>
+  {%- else -%}
+    <div class="avatar{{ ' sm' if small }}" style="--h: {{ (ap.id * 47) % 360 }}" aria-label="{{ ap.display_name }}">{{ ap.initials }}</div>
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro status_pill(status) -%}
+  <span class="pill {{ status }}">{{ status.replace('_', ' ').title() }}</span>
+{%- endmacro %}
+
+{% macro issue_list(issues) -%}
+  {% if issues %}
+  <ul class="notes">
+    {% for i in issues %}
+      <li><span class="lvl {{ i.level }}">{{ i.level }}</span><span>{{ i.field.replace('_', ' ') }}: {{ i.message }}</span></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+{%- endmacro %}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% from "_macros.html" import photo, status_pill, issue_list %}
+{% block title %}{{ ap.display_name }}{% endblock %}
+{% block content %}
+<div class="headrow">
+  <div>
+    <h1>{{ ap.display_name }}</h1>
+    <p class="sub" style="margin:0">
+      {{ status_pill(ap.status) }}
+      {% if ap.preferred_name %}<span class="meta"> · legal name {{ ap.first_name }} {{ ap.last_name }}</span>{% endif %}
+      <span class="meta"> · added {{ ap.created_at|shortdate }} via {{ ap.source }}</span>
+    </p>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    {% if nav.prev %}<a class="btn" href="/applicants/{{ nav.prev }}" aria-label="Previous applicant">← Prev</a>{% endif %}
+    <span class="btn" style="cursor:default">{{ nav.pos }} / {{ nav.total }}</span>
+    {% if nav.next %}<a class="btn" href="/applicants/{{ nav.next }}" aria-label="Next applicant">Next →</a>{% endif %}
+    <a class="btn primary" href="/applicants/{{ ap.id }}/edit">Edit</a>
+  </div>
+</div>
+
+<div class="profile">
+  <aside class="side">
+    <div class="headshot">{{ photo(ap) }}</div>
+    <form method="post" action="/applicants/{{ ap.id }}/headshot" enctype="multipart/form-data">
+      <label for="hs">{{ 'Replace' if ap.headshot_path else 'Upload' }} headshot</label>
+      <div class="row">
+        <input id="hs" type="file" name="file" accept="image/*" required>
+        <button class="btn" type="submit">Save</button>
+      </div>
+    </form>
+    {% if ap.headshot_path %}
+    <form method="post" action="/applicants/{{ ap.id }}/headshot/delete">
+      <button class="btn small danger" type="submit">Remove headshot</button>
+    </form>
+    {% endif %}
+
+    <form method="post" action="/applicants/{{ ap.id }}/status" class="panel" style="padding:14px">
+      <label for="st">Status</label>
+      <div class="row">
+        <select id="st" name="status">
+          {% for s in Status %}<option value="{{ s.value }}" {{ 'selected' if ap.status == s.value }}>{{ s.label }}</option>{% endfor %}
+        </select>
+        <button class="btn" type="submit">Update</button>
+      </div>
+    </form>
+
+    {% if ap.notes_list %}
+    <details class="panel" style="padding:14px;margin-top:12px">
+      <summary>Cleaned on import ({{ ap.notes_list|length }})</summary>
+      <div style="margin-top:8px">{{ issue_list(ap.notes_list) }}</div>
+    </details>
+    {% endif %}
+  </aside>
+
+  <section class="panel">
+    <dl class="kv">
+      {% for key, label in fields if key not in long_fields and key not in ('first_name', 'last_name', 'preferred_name') %}
+        {% set val = ap[key] %}
+        <dt>{{ label }}</dt>
+        {% if val is none or val == '' %}
+          <dd class="blank">—</dd>
+        {% elif key == 'email' %}<dd><a href="mailto:{{ val }}">{{ val }}</a></dd>
+        {% elif key == 'phone' %}<dd><a href="tel:{{ val }}">{{ val }}</a></dd>
+        {% elif key in ('linkedin', 'resume_url') %}<dd><a href="{{ val }}" target="_blank" rel="noopener noreferrer">{{ val.replace('https://', '').replace('www.', '') }}</a></dd>
+        {% elif key == 'gpa' %}<dd>{{ '%.2f'|format(val) }}</dd>
+        {% else %}<dd>{{ val }}</dd>
+        {% endif %}
+      {% endfor %}
+      {% if ap.submitted_at %}<dt>Form submitted</dt><dd>{{ ap.submitted_at|longdate }}</dd>{% endif %}
+    </dl>
+    <div class="long">
+      {% for key, label in fields if key in long_fields %}
+        <h3>{{ label }}</h3>
+        {% if ap[key] %}<p>{{ ap[key] }}</p>{% else %}<p class="meta" style="color:var(--muted)">No answer</p>{% endif %}
+      {% endfor %}
+    </div>
+    <hr>
+    <form method="post" action="/applicants/{{ ap.id }}/delete" onsubmit="return confirm('Delete {{ ap.display_name|e }}? This can\'t be undone.')">
+      <button class="btn small danger" type="submit">Delete applicant</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

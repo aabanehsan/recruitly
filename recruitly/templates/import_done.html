@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Import complete{% endblock %}
+{% block content %}
+<h1>Import complete</h1>
+<p class="sub">Profiles are ready on the board.</p>
+<div class="stats">
+  <div class="stat"><b>{{ s.created }}</b><span>profiles created</span></div>
+  <div class="stat"><b>{{ s.updated }}</b><span>profiles updated</span></div>
+  <div class="stat"><b>{{ s.skipped }}</b><span>rows skipped</span></div>
+  <div class="stat"><b>{{ s.headshots_saved }}</b><span>headshots saved</span></div>
+</div>
+{% if s.headshots_missing %}
+<div class="panel" style="margin-bottom:18px">
+  <h2>{{ s.headshots_missing|length }} still need a headshot</h2>
+  <p class="sub" style="margin-bottom:10px">Google Drive usually keeps form uploads private, so they can't be downloaded automatically. Download the form's upload folder from Drive as a .zip and drop it into the bulk uploader, which matches photos to people by name.</p>
+  <p class="sample">{{ s.headshots_missing|join(', ') }}</p>
+  <a class="btn primary" href="/headshots-bulk">Bulk upload headshots</a>
+</div>
+{% endif %}
+<a class="btn" href="/">Go to applicants</a>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% from "_macros.html" import photo, status_pill %}
+{% block title %}Applicants{% endblock %}
+{% block content %}
+<div class="headrow">
+  <div>
+    <h1>Applicants</h1>
+    <p class="sub" style="margin:0">{{ total }} in {{ settings.cycle_name }}{% if applicants|length != total %} · showing {{ applicants|length }}{% endif %}</p>
+  </div>
+  <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btn" href="/export.csv">Export CSV</a>
+    <a class="btn primary" href="/import">Import responses</a>
+  </div>
+</div>
+
+{% if total %}
+<div class="chips">
+  {% set base = {'q': f.q, 'major': f.major, 'year': f.year, 'sort': f.sort} %}
+  <a class="chip {{ 'on' if not f.status }}" href="/?{{ base|urlencode }}">All<b>{{ total }}</b></a>
+  {% for s in Status %}
+    {% if counts.get(s.value) %}
+    <a class="chip {{ 'on' if f.status == s.value }}" href="/?{{ (base | combine({'status': s.value}))|urlencode }}">{{ s.label }}<b>{{ counts[s.value] }}</b></a>
+    {% endif %}
+  {% endfor %}
+</div>
+
+<form class="toolbar" method="get" action="/">
+  <input type="search" name="q" value="{{ f.q }}" placeholder="Search name, email, EID, major, hometown" aria-label="Search">
+  <input type="hidden" name="status" value="{{ f.status }}">
+  <select name="major" aria-label="Major" onchange="this.form.submit()">
+    <option value="">All majors</option>
+    {% for m in majors %}<option {{ 'selected' if f.major == m }}>{{ m }}</option>{% endfor %}
+  </select>
+  <select name="year" aria-label="Year" onchange="this.form.submit()">
+    <option value="">All years</option>
+    {% for y in years %}<option {{ 'selected' if f.year == y }}>{{ y }}</option>{% endfor %}
+  </select>
+  <select name="sort" aria-label="Sort" onchange="this.form.submit()">
+    {% for k, label in [('name','Name'),('newest','Newest'),('gpa','GPA'),('status','Status')] %}
+      <option value="{{ k }}" {{ 'selected' if f.sort == k }}>Sort: {{ label }}</option>
+    {% endfor %}
+  </select>
+  <button class="btn" type="submit">Search</button>
+</form>
+{% endif %}
+
+{% if applicants %}
+<div class="grid">
+  {% for ap in applicants %}
+  <a class="card" href="/applicants/{{ ap.id }}">
+    {{ photo(ap) }}
+    <div class="body">
+      <div class="name">{{ ap.display_name }}</div>
+      <div class="meta">{{ ap.major or 'Major not listed' }}{% if ap.second_major %} + {{ ap.second_major }}{% endif %}</div>
+      <div class="meta">{{ ap.classification or '' }}{% if ap.classification and ap.grad_term %} · {% endif %}{{ ap.grad_term or '' }}</div>
+      <div class="foot">{{ status_pill(ap.status) }}{% if ap.gpa %}<span class="meta">{{ '%.2f'|format(ap.gpa) }}</span>{% endif %}</div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% elif total %}
+<div class="panel empty"><h2>No matches</h2><p>Try a different search or <a href="/">clear the filters</a>.</p></div>
+{% else %}
+<div class="panel empty">
+  <h2>No applicants yet</h2>
+  <p>Import your Google Form responses to create a profile for everyone at once.</p>
+  <p><a class="btn primary" href="/import">Import responses</a> <a class="btn" href="/applicants/new">Add one manually</a></p>
+</div>
+{% endif %}
+{% endblock %}

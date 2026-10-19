@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit ' ~ ap.display_name if ap else 'Add applicant' }}{% endblock %}
+{% block content %}
+<h1>{{ 'Edit ' ~ ap.display_name if ap else 'Add applicant' }}</h1>
+<p class="sub">Entries are cleaned the same way imports are: names capitalized, phone formatted, majors matched to the official list.</p>
+
+{% set by_field = {} %}
+{% for i in issues %}{% set _ = by_field.setdefault(i.field, []).append(i) %}{% endfor %}
+{% if issues|selectattr('level', 'equalto', 'error')|list %}
+  <div class="flash err">Fix the highlighted fields and save again.</div>
+{% endif %}
+
+<form method="post" class="panel" action="{{ '/applicants/%d/edit'|format(ap.id) if ap and ap.id else '/applicants/new' }}">
+  <datalist id="majors">{% for m in majors %}<option value="{{ m }}">{% endfor %}</datalist>
+  <div class="fgrid">
+    {% for key, label in fields %}
+      <div class="{{ 'full' if key in long_fields }}">
+        <label for="f_{{ key }}">{{ label }}{% if key in ('first_name', 'email') %} *{% endif %}</label>
+        {% if key in long_fields %}
+          <textarea id="f_{{ key }}" name="{{ key }}">{{ values.get(key, '') }}</textarea>
+        {% elif key == 'classification' %}
+          <select id="f_{{ key }}" name="{{ key }}">
+            <option value=""></option>
+            {% for c in ['Freshman','Sophomore','Junior','Senior','Transfer','Graduate'] %}
+              <option {{ 'selected' if values.get(key) == c }}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        {% else %}
+          <input id="f_{{ key }}" name="{{ key }}" value="{{ values.get(key, '') }}"
+            {% if key in ('major', 'second_major') %}list="majors"{% endif %}
+            {% if key == 'email' %}type="email" required{% endif %}
+            {% if key == 'first_name' %}required{% endif %}
+            {% if key == 'gpa' %}inputmode="decimal" placeholder="e.g. 3.67"{% endif %}
+            {% if key == 'grad_term' %}placeholder="e.g. May 2028"{% endif %}
+            {% if key == 'eid' %}placeholder="e.g. ab12345"{% endif %}>
+        {% endif %}
+        {% for i in by_field.get(key, []) %}
+          <div class="{{ 'ferr' if i.level == 'error' else 'fwarn' }}">{{ i.message }}</div>
+        {% endfor %}
+      </div>
+    {% endfor %}
+  </div>
+  <div class="actions">
+    <button class="btn primary" type="submit">{{ 'Save changes' if ap and ap.id else 'Create profile' }}</button>
+    <a class="btn" href="{{ '/applicants/%d'|format(ap.id) if ap and ap.id else '/' }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

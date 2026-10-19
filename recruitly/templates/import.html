@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Import{% endblock %}
+{% block content %}
+<h1>Import form responses</h1>
+<p class="sub">Bring in your Google Form responses. You'll see a preview of every cleaned row before anything is saved.</p>
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+
+<div class="two">
+  <form class="panel" method="post" action="/import" enctype="multipart/form-data">
+    <h2>Upload a CSV</h2>
+    <ol class="steps">
+      <li>Open the form's <b>Responses</b> tab and click <b>View in Sheets</b>.</li>
+      <li>In the sheet: <b>File → Download → Comma-separated values (.csv)</b>.</li>
+      <li>Upload that file here.</li>
+    </ol>
+    <div style="margin-top:14px"><input type="file" name="file" accept=".csv,text/csv" required aria-label="CSV file"></div>
+    <div class="actions"><button class="btn primary" type="submit">Preview import</button></div>
+  </form>
+
+  <form class="panel" method="post" action="/import">
+    <h2>Or paste a Google Sheets link</h2>
+    <ol class="steps">
+      <li>In the responses sheet click <b>Share</b>.</li>
+      <li>Under General access pick <b>Anyone with the link → Viewer</b>.</li>
+      <li>Copy the link and paste it below. Running the import again later only adds new people and updates changed answers.</li>
+    </ol>
+    <div style="margin-top:14px"><input type="url" name="sheet_url" placeholder="https://docs.google.com/spreadsheets/d/…" required aria-label="Google Sheets link"></div>
+    <div class="actions"><button class="btn primary" type="submit">Preview import</button></div>
+  </form>
+</div>
+
+<div class="panel" style="margin-top:18px">
+  <h2>What gets cleaned up</h2>
+  <ul class="steps">
+    <li><b>Columns</b> are matched to profile fields from the question text ("What's your major?" → Major). You can fix any mapping in the preview.</li>
+    <li><b>Names</b> get proper capitalization (jOHN mcdonald → John McDonald). A single "Full name" question is split into first and last.</li>
+    <li><b>Emails</b> are lowercased, common typos are fixed (@utexas.com → @utexas.edu), and invalid ones are flagged.</li>
+    <li><b>Majors</b> like "cs", "comp sci" or "MIS" are matched to the official major list, and "CS and Math" becomes two majors.</li>
+    <li><b>Phones, GPAs, graduation terms, LinkedIn and Instagram</b> are put into one consistent format.</li>
+    <li><b>Duplicates</b>: if someone submits twice, only their newest response is kept. People already in the system are updated instead of duplicated.</li>
+    <li><b>Headshots</b> from file-upload questions are downloaded, cropped to a square and resized. If Drive blocks the download, use the <a href="/headshots-bulk">bulk headshot upload</a>.</li>
+  </ul>
+</div>
+{% endblock %}
