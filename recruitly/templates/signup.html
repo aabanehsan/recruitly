@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Join {{ settings.org_name }}{% endblock %}
+{% block content %}
+<div class="authbox">
+  {% if problem %}
+  <div class="panel">
+    <h1>Invite not available</h1>
+    <p class="sub" style="margin:0">{{ problem }}</p>
+    <div class="actions"><a class="btn" href="/login">Go to login</a></div>
+  </div>
+  {% else %}
+  <form class="panel" method="post" action="/signup/{{ inv.token }}">{{ csrf_field }}
+    <h1>Join {{ settings.org_name }}</h1>
+    <p class="sub">You've been invited as {{ 'an admin' if inv.role == 'admin' else 'a member' }} for {{ settings.cycle_name }}. Create your account to get started.</p>
+    <label for="f_name">Your name</label>
+    <input id="f_name" name="name" value="{{ values.get('name', '') }}" autocomplete="name" required autofocus>
+    {% if errors.name %}<div class="ferr">{{ errors.name }}</div>{% endif %}
+    <label for="f_email" style="margin-top:14px">Email</label>
+    <input id="f_email" name="email" type="email" value="{{ values.get('email', '') }}" autocomplete="username" required {{ 'readonly' if inv.email }}>
+    {% if errors.email %}<div class="ferr">{{ errors.email }}</div>{% elif inv.email %}<div class="hint">This invite is for this address.</div>{% endif %}
+    <label for="f_password" style="margin-top:14px">Password</label>
+    <input id="f_password" name="password" type="password" autocomplete="new-password" minlength="{{ min_len }}" required>
+    {% if errors.password %}<div class="ferr">{{ errors.password }}</div>{% else %}<div class="hint">At least {{ min_len }} characters.</div>{% endif %}
+    <label for="f_confirm" style="margin-top:14px">Confirm password</label>
+    <input id="f_confirm" name="confirm" type="password" autocomplete="new-password" required>
+    {% if errors.confirm %}<div class="ferr">{{ errors.confirm }}</div>{% endif %}
+    <div class="actions"><button class="btn primary wide" type="submit">Create account</button></div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

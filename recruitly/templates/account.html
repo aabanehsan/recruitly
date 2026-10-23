@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Your account{% endblock %}
+{% block content %}
+<h1>Your account</h1>
+<p class="sub">{{ me.name }} · {{ me.email }} · <span class="role {{ me.role }}">{{ me.role }}</span></p>
+<div class="two">
+  <form class="panel" method="post" action="/account/password">{{ csrf_field }}
+    <h2>Change password</h2>
+    <label for="f_current">Current password</label>
+    <input id="f_current" name="current" type="password" autocomplete="current-password" required>
+    {% if errors.current %}<div class="ferr">{{ errors.current }}</div>{% endif %}
+    <label for="f_password" style="margin-top:14px">New password</label>
+    <input id="f_password" name="password" type="password" autocomplete="new-password" minlength="{{ min_len }}" required>
+    {% if errors.password %}<div class="ferr">{{ errors.password }}</div>{% else %}<div class="hint">At least {{ min_len }} characters.</div>{% endif %}
+    <label for="f_confirm" style="margin-top:14px">Confirm new password</label>
+    <input id="f_confirm" name="confirm" type="password" autocomplete="new-password" required>
+    {% if errors.confirm %}<div class="ferr">{{ errors.confirm }}</div>{% endif %}
+    <div class="actions"><button class="btn primary" type="submit">Change password</button></div>
+  </form>
+  <div class="panel">
+    <h2>What you can do</h2>
+    {% if me.is_admin %}
+    <ul class="steps">
+      <li><b>Everything:</b> import responses, edit profiles, change statuses, upload headshots and export.</li>
+      <li><b>Manage the team</b> on the <a href="/members">Members</a> page: send invite links, make someone an admin, or remove access.</li>
+    </ul>
+    {% else %}
+    <ul class="steps">
+      <li><b>View</b> every applicant on the board and their full profile.</li>
+      <li>Notes and scoring arrive in a later release. Ask an admin if you need to change something.</li>
+    </ul>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

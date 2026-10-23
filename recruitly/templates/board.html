@@ -7,10 +7,12 @@
     <h1>Applicants</h1>
     <p class="sub" style="margin:0">{{ total }} in {{ settings.cycle_name }}{% if applicants|length != total %} · showing {{ applicants|length }}{% endif %}</p>
   </div>
+  {% if me.is_admin %}
   <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
     <a class="btn" href="/export.csv">Export CSV</a>
     <a class="btn primary" href="/import">Import responses</a>
   </div>
+  {% endif %}
 </div>
 
 {% if total %}
@@ -63,8 +65,12 @@
 {% else %}
 <div class="panel empty">
   <h2>No applicants yet</h2>
+  {% if me.is_admin %}
   <p>Import your Google Form responses to create a profile for everyone at once.</p>
   <p><a class="btn primary" href="/import">Import responses</a> <a class="btn" href="/applicants/new">Add one manually</a></p>
+  {% else %}
+  <p>An admin hasn't imported any applicants yet. Check back soon.</p>
+  {% endif %}
 </div>
 {% endif %}
 {% endblock %}

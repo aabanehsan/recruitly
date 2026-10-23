@@ -4,18 +4,19 @@ from __future__ import annotations
 
 import csv
 import io
-from pathlib import Path
-from urllib.parse import urlencode
-
+import re
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.exception_handlers import http_exception_handler
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.sessions import SessionMiddleware
 
 from . import __version__
+from .accounts import register_account_routes
 from .config import settings
 from .db import get_session, init_db
 from .models import LONG_TEXT_FIELDS, PROFILE_FIELDS, Applicant, Status
@@ -24,14 +25,10 @@ from .services.headshots import HeadshotError, delete_headshot, match_zip, save_
 from .services.importer import (
     PROFILE_KEYS, ImportError_, apply_preview, build_preview, fetch_sheet, load_preview, read_csv, save_preview,
 )
+from .web import HERE, LoginRequired, csrf_protect, current_user, redirect, require_admin, templates
 
-HERE = Path(__file__).parent
-templates = Jinja2Templates(directory=HERE / "templates")
-templates.env.globals.update(settings=settings, Status=Status, version=__version__)
-templates.env.filters["combine"] = lambda a, b: {**a, **b}
-templates.env.filters["shortdate"] = lambda d: f"{d:%b} {d.day}" if d else ""
-templates.env.filters["longdate"] = lambda d: (f"{d:%b} {d.day}, {d.year} {d.hour % 12 or 12}:{d:%M} "
-                                               f"{'AM' if d.hour < 12 else 'PM'}") if d else ""
+HEADSHOT_NAME = re.compile(r"^[A-Za-z0-9_-]{1,80}\.(jpg|jpeg|png|webp)$")
+SESSION_DAYS = 14
 
 FIELD_LABELS = dict(PROFILE_FIELDS) | {
     "full_name": "Full name", "submitted_at": "Timestamp", "headshot": "Headshot upload",
@@ -40,16 +37,27 @@ FIELD_LABELS = dict(PROFILE_FIELDS) | {
 
 def create_app() -> FastAPI:
     init_db()
-    app = FastAPI(title="Recruitly", version=__version__)
+    app = FastAPI(title="Recruitly", version=__version__, dependencies=[Depends(csrf_protect)],
+                  docs_url=None, redoc_url=None, openapi_url=None)
+    app.add_middleware(SessionMiddleware, secret_key=settings.secret_key, session_cookie="recruitly_session",
+                       max_age=SESSION_DAYS * 24 * 3600, same_site="lax", https_only=settings.secure_cookies)
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
-    app.mount("/headshots", StaticFiles(directory=settings.headshot_dir), name="headshots")
+
+    @app.exception_handler(LoginRequired)
+    async def to_login(request: Request, exc: LoginRequired):
+        return RedirectResponse(exc.url, status_code=303)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def friendly_errors(request: Request, exc: StarletteHTTPException):
+        if exc.status_code in (403, 404) and "text/html" in request.headers.get("accept", "text/html"):
+            title = "Not allowed" if exc.status_code == 403 else "Not found"
+            return templates.TemplateResponse(request, "error.html", {"title": title, "detail": exc.detail},
+                                              status_code=exc.status_code)
+        return await http_exception_handler(request, exc)
+
+    register_account_routes(app)
     register_routes(app)
     return app
-
-
-def redirect(url: str, **params: str) -> RedirectResponse:
-    q = {k: v for k, v in params.items() if v}
-    return RedirectResponse(url + (("?" + urlencode(q)) if q else ""), status_code=303)
 
 
 def get_applicant(session: Session, applicant_id: int) -> Applicant:
@@ -62,7 +70,7 @@ def get_applicant(session: Session, applicant_id: int) -> Applicant:
 def register_routes(app: FastAPI) -> None:
     # ------------------------------------------------------------ board
 
-    @app.get("/", response_class=HTMLResponse)
+    @app.get("/", response_class=HTMLResponse, dependencies=[Depends(current_user)])
     def board(request: Request, q: str = "", status: str = "", major: str = "", year: str = "",
               sort: str = "name", msg: str = "", session: Session = Depends(get_session)):
         stmt = select(Applicant)
@@ -97,19 +105,27 @@ def register_routes(app: FastAPI) -> None:
             "f": {"q": q, "status": status, "major": major, "year": year, "sort": sort}, "msg": msg,
         })
 
+    @app.get("/headshots/{name}", dependencies=[Depends(current_user)])
+    def headshot_file(name: str):
+        """Headshots are only served to logged-in members, never as public static files."""
+        path = settings.headshot_dir / name
+        if not HEADSHOT_NAME.match(name) or not path.is_file():
+            raise HTTPException(404, "Headshot not found")
+        return FileResponse(path, headers={"Cache-Control": "private, max-age=3600"})
+
     # ------------------------------------------------------------ profiles
 
-    @app.get("/applicants/new", response_class=HTMLResponse)
+    @app.get("/applicants/new", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
     def new_form(request: Request):
         return templates.TemplateResponse(request, "edit.html", form_ctx(None, {}, []))
 
-    @app.post("/applicants/new", response_class=HTMLResponse)
+    @app.post("/applicants/new", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
     async def create(request: Request, session: Session = Depends(get_session)):
         form = await request.form()
         raw = {k: str(form.get(k, "")) for k in PROFILE_KEYS}
         return save_profile(request, session, None, raw)
 
-    @app.get("/applicants/{applicant_id}", response_class=HTMLResponse)
+    @app.get("/applicants/{applicant_id}", response_class=HTMLResponse, dependencies=[Depends(current_user)])
     def profile(request: Request, applicant_id: int, msg: str = "", session: Session = Depends(get_session)):
         ap = get_applicant(session, applicant_id)
         ids = session.scalars(select(Applicant.id).order_by(Applicant.last_name, Applicant.first_name)).all()
@@ -120,20 +136,20 @@ def register_routes(app: FastAPI) -> None:
             "ap": ap, "fields": PROFILE_FIELDS, "long_fields": LONG_TEXT_FIELDS, "msg": msg, "nav": nav,
         })
 
-    @app.get("/applicants/{applicant_id}/edit", response_class=HTMLResponse)
+    @app.get("/applicants/{applicant_id}/edit", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
     def edit_form(request: Request, applicant_id: int, session: Session = Depends(get_session)):
         ap = get_applicant(session, applicant_id)
         values = {k: getattr(ap, k) if getattr(ap, k) is not None else "" for k in PROFILE_KEYS}
         return templates.TemplateResponse(request, "edit.html", form_ctx(ap, values, []))
 
-    @app.post("/applicants/{applicant_id}/edit", response_class=HTMLResponse)
+    @app.post("/applicants/{applicant_id}/edit", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
     async def update(request: Request, applicant_id: int, session: Session = Depends(get_session)):
         ap = get_applicant(session, applicant_id)
         form = await request.form()
         raw = {k: str(form.get(k, "")) for k in PROFILE_KEYS}
         return save_profile(request, session, ap, raw)
 
-    @app.post("/applicants/{applicant_id}/status")
+    @app.post("/applicants/{applicant_id}/status", dependencies=[Depends(require_admin)])
     def set_status(applicant_id: int, status: str = Form(...), next: str = Form(""),
                    session: Session = Depends(get_session)):
         ap = get_applicant(session, applicant_id)
@@ -146,7 +162,7 @@ def register_routes(app: FastAPI) -> None:
             return RedirectResponse(next, status_code=303)
         return redirect(f"/applicants/{ap.id}", msg=f"Status set to {ap.status_enum.label}")
 
-    @app.post("/applicants/{applicant_id}/headshot")
+    @app.post("/applicants/{applicant_id}/headshot", dependencies=[Depends(require_admin)])
     async def upload_headshot(applicant_id: int, file: UploadFile = File(...), session: Session = Depends(get_session)):
         ap = get_applicant(session, applicant_id)
         data = await file.read()
@@ -157,7 +173,7 @@ def register_routes(app: FastAPI) -> None:
         session.commit()
         return redirect(f"/applicants/{ap.id}", msg="Headshot updated")
 
-    @app.post("/applicants/{applicant_id}/headshot/delete")
+    @app.post("/applicants/{applicant_id}/headshot/delete", dependencies=[Depends(require_admin)])
     def remove_headshot(applicant_id: int, session: Session = Depends(get_session)):
         ap = get_applicant(session, applicant_id)
         if ap.headshot_path:
@@ -166,7 +182,7 @@ def register_routes(app: FastAPI) -> None:
             session.commit()
         return redirect(f"/applicants/{ap.id}", msg="Headshot removed")
 
-    @app.post("/applicants/{applicant_id}/delete")
+    @app.post("/applicants/{applicant_id}/delete", dependencies=[Depends(require_admin)])
     def delete(applicant_id: int, session: Session = Depends(get_session)):
         ap = get_applicant(session, applicant_id)
         name = ap.display_name
@@ -178,11 +194,11 @@ def register_routes(app: FastAPI) -> None:
 
     # ------------------------------------------------------------ import
 
-    @app.get("/import", response_class=HTMLResponse)
+    @app.get("/import", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
     def import_page(request: Request, error: str = ""):
         return templates.TemplateResponse(request, "import.html", {"error": error})
 
-    @app.post("/import")
+    @app.post("/import", dependencies=[Depends(require_admin)])
     async def import_upload(file: UploadFile | None = File(None), sheet_url: str = Form(""),
                             session: Session = Depends(get_session)):
         try:
@@ -199,7 +215,7 @@ def register_routes(app: FastAPI) -> None:
             return redirect("/import", error=str(e))
         return redirect(f"/import/{pv.token}")
 
-    @app.get("/import/{token}", response_class=HTMLResponse)
+    @app.get("/import/{token}", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
     def import_preview(request: Request, token: str, session: Session = Depends(get_session)):
         try:
             pv = load_preview(session, token, settings.email_domain)
@@ -209,7 +225,7 @@ def register_routes(app: FastAPI) -> None:
             "pv": pv, "field_labels": FIELD_LABELS, "mappable": list(HEADER_KEYWORDS),
         })
 
-    @app.post("/import/{token}/mapping")
+    @app.post("/import/{token}/mapping", dependencies=[Depends(require_admin)])
     async def import_remap(request: Request, token: str, session: Session = Depends(get_session)):
         form = await request.form()
         try:
@@ -225,7 +241,7 @@ def register_routes(app: FastAPI) -> None:
         save_preview(session, pv)
         return redirect(f"/import/{token}")
 
-    @app.post("/import/{token}/confirm", response_class=HTMLResponse)
+    @app.post("/import/{token}/confirm", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
     def import_confirm(request: Request, token: str, session: Session = Depends(get_session)):
         try:
             pv = load_preview(session, token, settings.email_domain)
@@ -236,11 +252,11 @@ def register_routes(app: FastAPI) -> None:
 
     # ------------------------------------------------------------ bulk headshots
 
-    @app.get("/headshots-bulk", response_class=HTMLResponse)
+    @app.get("/headshots-bulk", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
     def bulk_page(request: Request):
         return templates.TemplateResponse(request, "bulk.html", {"result": None, "error": ""})
 
-    @app.post("/headshots-bulk", response_class=HTMLResponse)
+    @app.post("/headshots-bulk", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
     async def bulk_upload(request: Request, file: UploadFile = File(...), overwrite: str = Form(""),
                           session: Session = Depends(get_session)):
         applicants = session.scalars(select(Applicant)).all()
@@ -266,7 +282,7 @@ def register_routes(app: FastAPI) -> None:
 
     # ------------------------------------------------------------ export
 
-    @app.get("/export.csv")
+    @app.get("/export.csv", dependencies=[Depends(require_admin)])
     def export_csv(session: Session = Depends(get_session)):
         buf = io.StringIO()
         w = csv.writer(buf)

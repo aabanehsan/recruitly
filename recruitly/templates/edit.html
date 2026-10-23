@@ -10,7 +10,7 @@
   <div class="flash err">Fix the highlighted fields and save again.</div>
 {% endif %}
 
-<form method="post" class="panel" action="{{ '/applicants/%d/edit'|format(ap.id) if ap and ap.id else '/applicants/new' }}">
+<form method="post" class="panel" action="{{ '/applicants/%d/edit'|format(ap.id) if ap and ap.id else '/applicants/new' }}">{{ csrf_field }}
   <datalist id="majors">{% for m in majors %}<option value="{{ m }}">{% endfor %}</datalist>
   <div class="fgrid">
     {% for key, label in fields %}

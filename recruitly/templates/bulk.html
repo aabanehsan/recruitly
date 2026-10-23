@@ -7,7 +7,7 @@
 {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
 
 <div class="two">
-  <form class="panel" method="post" action="/headshots-bulk" enctype="multipart/form-data">
+  <form class="panel" method="post" action="/headshots-bulk" enctype="multipart/form-data">{{ csrf_field }}
     <h2>Upload a .zip</h2>
     <ol class="steps">
       <li>In Google Drive, find the folder your form saved uploads to (usually <b>&lt;Form name&gt; (File responses)</b>).</li>

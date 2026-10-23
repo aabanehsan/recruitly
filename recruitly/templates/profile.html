@@ -15,14 +15,15 @@
     {% if nav.prev %}<a class="btn" href="/applicants/{{ nav.prev }}" aria-label="Previous applicant">← Prev</a>{% endif %}
     <span class="btn" style="cursor:default">{{ nav.pos }} / {{ nav.total }}</span>
     {% if nav.next %}<a class="btn" href="/applicants/{{ nav.next }}" aria-label="Next applicant">Next →</a>{% endif %}
-    <a class="btn primary" href="/applicants/{{ ap.id }}/edit">Edit</a>
+    {% if me.is_admin %}<a class="btn primary" href="/applicants/{{ ap.id }}/edit">Edit</a>{% endif %}
   </div>
 </div>
 
 <div class="profile">
   <aside class="side">
     <div class="headshot">{{ photo(ap) }}</div>
-    <form method="post" action="/applicants/{{ ap.id }}/headshot" enctype="multipart/form-data">
+    {% if me.is_admin %}
+    <form method="post" action="/applicants/{{ ap.id }}/headshot" enctype="multipart/form-data">{{ csrf_field }}
       <label for="hs">{{ 'Replace' if ap.headshot_path else 'Upload' }} headshot</label>
       <div class="row">
         <input id="hs" type="file" name="file" accept="image/*" required>
@@ -30,12 +31,12 @@
       </div>
     </form>
     {% if ap.headshot_path %}
-    <form method="post" action="/applicants/{{ ap.id }}/headshot/delete">
+    <form method="post" action="/applicants/{{ ap.id }}/headshot/delete">{{ csrf_field }}
       <button class="btn small danger" type="submit">Remove headshot</button>
     </form>
     {% endif %}
 
-    <form method="post" action="/applicants/{{ ap.id }}/status" class="panel" style="padding:14px">
+    <form method="post" action="/applicants/{{ ap.id }}/status" class="panel" style="padding:14px">{{ csrf_field }}
       <label for="st">Status</label>
       <div class="row">
         <select id="st" name="status">
@@ -44,6 +45,8 @@
         <button class="btn" type="submit">Update</button>
       </div>
     </form>
+
+    {% endif %}
 
     {% if ap.notes_list %}
     <details class="panel" style="padding:14px;margin-top:12px">
@@ -75,10 +78,12 @@
         {% if ap[key] %}<p>{{ ap[key] }}</p>{% else %}<p class="meta" style="color:var(--muted)">No answer</p>{% endif %}
       {% endfor %}
     </div>
+    {% if me.is_admin %}
     <hr>
-    <form method="post" action="/applicants/{{ ap.id }}/delete" onsubmit="return confirm('Delete {{ ap.display_name|e }}? This can\'t be undone.')">
+    <form method="post" action="/applicants/{{ ap.id }}/delete" onsubmit="return confirm('Delete {{ ap.display_name|e }}? This can\'t be undone.')">{{ csrf_field }}
       <button class="btn small danger" type="submit">Delete applicant</button>
     </form>
+    {% endif %}
   </section>
 </div>
 {% endblock %}

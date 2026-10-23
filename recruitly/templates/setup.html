@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Set up{% endblock %}
+{% block content %}
+<div class="authbox">
+  <form class="panel" method="post" action="/setup">{{ csrf_field }}
+    <h1>Welcome to Recruitly</h1>
+    <p class="sub">Create the first account. It becomes the admin, who can import applicants and invite the rest of your exec team.</p>
+    {% set fields = [('name', 'Your name', 'text', 'name'), ('email', 'Email', 'email', 'username'),
+                     ('password', 'Password', 'password', 'new-password'), ('confirm', 'Confirm password', 'password', 'new-password')] %}
+    {% for key, label, type, ac in fields %}
+      <label for="f_{{ key }}" {% if not loop.first %}style="margin-top:14px"{% endif %}>{{ label }}</label>
+      <input id="f_{{ key }}" name="{{ key }}" type="{{ type }}" autocomplete="{{ ac }}" required
+             value="{{ values.get(key, '') if type != 'password' else '' }}" {{ 'autofocus' if loop.first }}
+             {% if key == 'password' %}minlength="{{ min_len }}"{% endif %}>
+      {% if errors.get(key) %}<div class="ferr">{{ errors[key] }}</div>{% elif key == 'password' %}<div class="hint">At least {{ min_len }} characters.</div>{% endif %}
+    {% endfor %}
+    <div class="actions"><button class="btn primary wide" type="submit">Create admin account</button></div>
+  </form>
+</div>
+{% endblock %}

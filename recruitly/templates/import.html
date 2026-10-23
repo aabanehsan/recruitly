@@ -6,7 +6,7 @@
 {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
 
 <div class="two">
-  <form class="panel" method="post" action="/import" enctype="multipart/form-data">
+  <form class="panel" method="post" action="/import" enctype="multipart/form-data">{{ csrf_field }}
     <h2>Upload a CSV</h2>
     <ol class="steps">
       <li>Open the form's <b>Responses</b> tab and click <b>View in Sheets</b>.</li>
@@ -17,7 +17,7 @@
     <div class="actions"><button class="btn primary" type="submit">Preview import</button></div>
   </form>
 
-  <form class="panel" method="post" action="/import">
+  <form class="panel" method="post" action="/import">{{ csrf_field }}
     <h2>Or paste a Google Sheets link</h2>
     <ol class="steps">
       <li>In the responses sheet click <b>Share</b>.</li>

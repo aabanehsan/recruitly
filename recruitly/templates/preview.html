@@ -8,7 +8,7 @@
     <h1>Review import</h1>
     <p class="sub" style="margin:0">{{ pv.rows|length }} responses from {{ pv.source_name }}. Nothing is saved until you confirm.</p>
   </div>
-  <form method="post" action="/import/{{ pv.token }}/confirm">
+  <form method="post" action="/import/{{ pv.token }}/confirm">{{ csrf_field }}
     <button class="btn primary" type="submit" {{ 'disabled' if pv.problems or not (c['create'] + c['update']) }}>
       Import {{ c['create'] + c['update'] }} applicant{{ '' if c['create'] + c['update'] == 1 else 's' }}
     </button>
@@ -29,7 +29,7 @@
 
 <details class="panel" {{ 'open' if pv.problems }} style="margin-bottom:18px">
   <summary>Column mapping ({{ pv.mapping.values()|select|list|length }} of {{ pv.headers|length }} columns used)</summary>
-  <form method="post" action="/import/{{ pv.token }}/mapping" style="margin-top:14px">
+  <form method="post" action="/import/{{ pv.token }}/mapping" style="margin-top:14px">{{ csrf_field }}
     <div class="tablewrap">
       <table class="mapping">
         <thead><tr><th>Form question</th><th>Saved as</th><th>First answer</th></tr></thead>

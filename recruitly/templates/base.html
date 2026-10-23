@@ -12,12 +12,24 @@
   <div class="wrap">
     <a class="brand" href="/"><span class="dot"></span>{{ settings.org_name }} <small>{{ settings.cycle_name }}</small></a>
     {% set path = request.url.path %}
+    {% if me %}
     <nav class="nav">
       <a href="/" class="{{ 'on' if path == '/' or path.startswith('/applicants/') and not path.endswith('/new') }}">Applicants</a>
+      {% if me.is_admin %}
       <a href="/import" class="{{ 'on' if path.startswith('/import') }}">Import</a>
       <a href="/headshots-bulk" class="{{ 'on' if path.startswith('/headshots-bulk') }}">Headshots</a>
       <a href="/applicants/new" class="{{ 'on' if path == '/applicants/new' }}">Add</a>
+      <a href="/members" class="{{ 'on' if path.startswith('/members') }}">Members</a>
+      {% endif %}
     </nav>
+    <div class="who">
+      <a href="/account" class="me {{ 'on' if path == '/account' }}" title="{{ me.email }}">
+        <span class="mini">{{ me.initials }}</span><span class="nm">{{ me.name }}</span>
+        <span class="role {{ me.role }}">{{ me.role }}</span>
+      </a>
+      <form method="post" action="/logout">{{ csrf_field }}<button class="linkbtn" type="submit">Log out</button></form>
+    </div>
+    {% endif %}
   </div>
 </header>
 <main>

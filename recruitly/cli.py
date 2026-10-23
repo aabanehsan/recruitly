@@ -3,6 +3,7 @@
     recruitly                 start the web app on http://127.0.0.1:8000
     recruitly demo            load sample applicants (messy form data + headshots), then start
     recruitly import FILE     import a Google Form CSV from the terminal
+    recruitly reset-password EMAIL   set a new password for an account (e.g. a locked-out admin)
 """
 
 from __future__ import annotations
@@ -25,6 +26,30 @@ def serve(host: str, port: int, open_browser: bool) -> None:
     if open_browser:
         Timer(1.2, lambda: webbrowser.open(url)).start()
     uvicorn.run("recruitly.app:create_app", factory=True, host=host, port=port, log_level="warning")
+
+
+def create_demo_accounts() -> list[tuple[str, str, str, str]]:
+    """Create the demo admin and member (if missing) and return their credentials.
+
+    Never adds accounts with well-known passwords to a data folder that already has real users."""
+    from sqlalchemy import select
+
+    from .db import init_db, session_scope
+    from .demo import DEMO_ACCOUNTS
+    from .models import User
+    from .services.auth import hash_password
+
+    init_db()
+    demo_emails = {a[1] for a in DEMO_ACCOUNTS}
+    with session_scope() as s:
+        if any(e not in demo_emails for e in s.scalars(select(User.email))):
+            print("  Demo accounts skipped: this data folder already has real accounts.")
+            return []
+        for name, email, password, role in DEMO_ACCOUNTS:
+            if not s.scalars(select(User).where(User.email == email)).first():
+                s.add(User(name=name, email=email, password_hash=hash_password(password), role=role))
+        s.commit()
+    return DEMO_ACCOUNTS
 
 
 def load_demo() -> None:
@@ -51,6 +76,41 @@ def load_demo() -> None:
         s.commit()
         print(f"  Loaded demo: {summary.created} applicants, {len(matches)} headshots, "
               f"{summary.skipped} rows skipped (bad data on purpose).")
+
+
+def print_demo_accounts(accounts) -> None:
+    if not accounts:
+        return
+    print("\n  Demo logins (also shown on the login page):")
+    for name, email, password, role in accounts:
+        print(f"    {role:<7} {email:<28} password: {password}")
+
+
+def reset_password(email: str) -> int:
+    import getpass
+
+    from sqlalchemy import select
+
+    from .db import init_db, session_scope
+    from .models import User
+    from .services.auth import hash_password, normalize_email, validate_account
+
+    init_db()
+    with session_scope() as s:
+        user = s.scalars(select(User).where(User.email == normalize_email(email))).first()
+        if user is None:
+            print(f"error: no account with email {email}", file=sys.stderr)
+            return 2
+        pw = getpass.getpass("  New password: ")
+        confirm = getpass.getpass("  Confirm: ")
+        errors = validate_account(user.name, user.email, pw, confirm)
+        if errors:
+            print(f"error: {' '.join(errors.values())}", file=sys.stderr)
+            return 2
+        user.password_hash = hash_password(pw)  # also signs them out everywhere
+        s.commit()
+    print(f"  Password changed for {user.name} ({user.role}).")
+    return 0
 
 
 def import_file(path: str, yes: bool) -> int:
@@ -88,21 +148,33 @@ def import_file(path: str, yes: bool) -> int:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="recruitly", description="Applicant tracking for student org recruitment.")
     p.add_argument("--version", action="version", version=f"recruitly {__version__}")
+    # server options work before or after the command: `recruitly demo --port 8123` or `recruitly --port 8123 demo`
+    server = argparse.ArgumentParser(add_help=False)
+    server.add_argument("--host", default=argparse.SUPPRESS)
+    server.add_argument("--port", type=int, default=argparse.SUPPRESS)
+    server.add_argument("--no-browser", action="store_true", default=argparse.SUPPRESS, help="don't open a browser tab")
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--no-browser", action="store_true", help="don't open a browser tab")
     sub = p.add_subparsers(dest="cmd")
-    sub.add_parser("serve", help="start the web app (default)")
-    sub.add_parser("demo", help="load sample data, then start the web app")
+    sub.add_parser("serve", parents=[server], help="start the web app (default)")
+    sub.add_parser("demo", parents=[server], help="load sample data, then start the web app")
     imp = sub.add_parser("import", help="import a Google Form responses CSV")
     imp.add_argument("file")
     imp.add_argument("-y", "--yes", action="store_true", help="don't ask for confirmation")
+    rp = sub.add_parser("reset-password", help="set a new password for an account")
+    rp.add_argument("email")
     args = p.parse_args(argv)
 
     if args.cmd == "import":
         return import_file(args.file, args.yes)
+    if args.cmd == "reset-password":
+        return reset_password(args.email)
     if args.cmd == "demo":
         load_demo()
+        accounts = create_demo_accounts()
+        print_demo_accounts(accounts)
+        settings.demo = bool(accounts)
     serve(args.host, args.port, not args.no_browser)
     return 0
 

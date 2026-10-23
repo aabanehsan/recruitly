@@ -8,8 +8,13 @@ Applicant tracking for student org recruitment. Point it at your Google Form res
 
 Most orgs run recruitment out of a Google Form and a messy spreadsheet. Names come in as `jOHN`, majors as `cs`, `comp sci` and `Computer Science`, phone numbers in five formats, and someone always submits twice. Headshots end up in a Drive folder that nobody can match to the right row. Recruitly fixes all of that on import and gives you a board you can actually run rush from.
 
-## Features (v0.1)
+## Features (v0.2)
 
+- **Accounts and roles.** Everyone logs in with their own email and password. **Admins** can do everything and manage the team; **members** can view the board and every profile, but can't change anything.
+  - The first account, created on a one-time setup page, becomes the admin.
+  - Admins invite people with **one-time signup links** (optionally locked to one email, expire after 7 days), change roles, and remove access, all from the **Members** page. Recruitly never sends email, so you paste the link into GroupMe or Slack.
+  - Passwords are hashed with Argon2, sessions are signed cookies, every form has a CSRF token, and repeated wrong passwords lock the login for a few minutes.
+  - Headshots are only served to logged-in members.
 - **Google Form import** from a CSV export or a shared Google Sheets link
 - **Automatic column mapping.** Form questions like "What is your major?" or "Expected graduation date" are matched to profile fields, and you can fix any mapping before importing.
 - **Validation and cleanup**, with every change listed so you can check it:
@@ -36,7 +41,16 @@ cd recruitly
 python3 run.py demo
 ```
 
-That one command sets up everything the first time, loads 12 sample form responses (fictional people, deliberately messy data), and opens the app at http://localhost:8000. Use `python3 run.py` without `demo` to start with an empty board.
+That one command sets up everything the first time, loads 12 sample form responses (fictional people, deliberately messy data), creates two demo logins, and opens the app at http://localhost:8000:
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin@demo.recruitly.dev` | `demo-admin-2026` |
+| Member | `member@demo.recruitly.dev` | `demo-member-2026` |
+
+They're printed in the terminal and shown on the login page too. Log in as the member to see the read-only view.
+
+Use `python3 run.py` without `demo` to start fresh: the first page asks you to create the admin account, then you invite the rest of your exec team from **Members**.
 
 Prefer to manage the environment yourself?
 
@@ -58,6 +72,13 @@ You can also import from the terminal:
 recruitly import responses.csv
 ```
 
+## Accounts
+
+- **First run:** open the app and create the admin account. That page disappears once an account exists.
+- **Inviting:** Members → *Create invite link*, then send the link. Each link works once. If you fill in an email, only that address can sign up with it.
+- **Roles:** admins can import, edit, change statuses, upload headshots, export and manage members. Members can view applicants (notes and scoring arrive in v0.4). There's always at least one admin, and you can't demote or remove yourself.
+- **Forgot a password?** Anyone can change their own on the account page. If someone is locked out, run `recruitly reset-password their@email.edu` on the machine running Recruitly. Changing a password signs that person out everywhere else.
+
 ## Configuration
 
 Set these as environment variables:
@@ -70,19 +91,25 @@ Set these as environment variables:
 | `RECRUITLY_DATA_DIR` | `./data` | Where the database and headshots live |
 | `RECRUITLY_DB_URL` | SQLite in the data dir | Any SQLAlchemy database URL |
 | `RECRUITLY_FETCH_HEADSHOTS` | `1` | Set to `0` to skip downloading headshots from Drive links |
+| `RECRUITLY_SECRET_KEY` | generated | Key that signs login cookies. By default one is generated into `data/secret_key` on first run |
+| `RECRUITLY_SECURE_COOKIES` | `0` | Set to `1` when serving over HTTPS so the login cookie is only sent securely |
 
 ## How it's built
 
 - **FastAPI** + **Jinja** templates, server-rendered with plain CSS and no frontend framework
 - **SQLAlchemy 2.0** with SQLite by default
 - **Pillow** for headshot processing
-- Cleaning lives in `recruitly/services/cleaning.py` as pure functions, so every rule is unit tested
+- **argon2-cffi** for password hashing and Starlette's signed session cookies for logins
+- Cleaning and account rules live in `recruitly/services/` as pure functions, so every rule is unit tested. A test checks that every route has an access rule, so a new page can't ship unprotected.
 
 ```
 recruitly/
-  app.py              routes
-  models.py           Applicant, ImportPreview
+  app.py              applicant, import and headshot routes
+  accounts.py         setup, login, invites, members, your account
+  web.py              templates, current user, admin check, CSRF
+  models.py           Applicant, ImportPreview, User, Invite
   services/
+    auth.py           password hashing, roles, invite and login rules
     cleaning.py       header mapping + field validation/cleanup
     importer.py       two-step import: preview, then apply
     headshots.py      Drive download, zip matching, crop/resize
@@ -96,11 +123,11 @@ Run the tests with `pip install -e ".[dev]" && pytest`.
 
 ## Roadmap
 
-Accounts and roles, interview scheduling, scoring rubrics, voting, live Sheets sync and Docker are planned. See [ROADMAP.md](ROADMAP.md).
+Interview scheduling, scoring rubrics, voting, live Sheets sync and Docker are planned. See [ROADMAP.md](ROADMAP.md).
 
 ## Privacy note
 
-Applicant data stays wherever you run Recruitly. v0.1 has no login, so run it on your own machine (the default only listens on localhost). Accounts and roles arrive in v0.2.
+Applicant data stays wherever you run Recruitly. Every page needs a login, and only admins can change or export data. The default only listens on localhost; if you put it on a server for your team, run it behind HTTPS and set `RECRUITLY_SECURE_COOKIES=1`.
 
 ## License
 

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Members{% endblock %}
+{% block content %}
+<div class="headrow">
+  <div>
+    <h1>Members</h1>
+    <p class="sub" style="margin:0">{{ users|length }} account{{ '' if users|length == 1 else 's' }} · admins can do everything, members can view applicants.</p>
+  </div>
+</div>
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+
+{% if new_invite %}
+<div class="panel invite-new">
+  <h2>Invite link ready</h2>
+  <p class="sample" style="margin:0 0 10px">Send this to {{ new_invite.email or 'the new member' }}. It works once and expires {{ new_invite.expires_at|shortdate }}.</p>
+  <input class="linkfield" readonly value="{{ base }}/signup/{{ new_invite.token }}" aria-label="Invite link" onclick="this.select()">
+</div>
+{% endif %}
+
+<div class="two members">
+  <div class="tablewrap">
+    <table class="mtable">
+      <thead><tr><th>Name</th><th>Role</th><th></th></tr></thead>
+      <tbody>
+      {% for u in users %}
+        <tr>
+          <td>
+            <div class="person"><span class="mini">{{ u.initials }}</span>
+              <div><b>{{ u.name }}</b>{% if u.id == me.id %} <span class="sample">(you)</span>{% endif %}<br>
+                <span class="sample">{{ u.email }}</span><br>
+                <span class="sample">{{ 'Last login ' ~ (u.last_login_at|shortdate) if u.last_login_at else 'Never logged in' }}</span></div>
+            </div>
+          </td>
+          <td>
+            {% if u.id == me.id %}
+              <span class="role {{ u.role }}">{{ u.role }}</span>
+            {% else %}
+            <form method="post" action="/members/{{ u.id }}/role" class="inline">{{ csrf_field }}
+              <select name="role" aria-label="Role for {{ u.name }}" onchange="this.form.submit()">
+                {% for r in Role %}<option value="{{ r.value }}" {{ 'selected' if u.role == r.value }}>{{ r.label }}</option>{% endfor %}
+              </select>
+              <noscript><button class="btn small" type="submit">Save</button></noscript>
+            </form>
+            {% endif %}
+          </td>
+          <td class="mact">
+            {% if u.id != me.id %}
+            <form method="post" action="/members/{{ u.id }}/remove" onsubmit="return confirm('Remove {{ u.name|e }}? They won\'t be able to log in.')">{{ csrf_field }}
+              <button class="btn small danger" type="submit">Remove</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div>
+    <form class="panel" method="post" action="/members/invite">{{ csrf_field }}
+      <h2>Invite someone</h2>
+      <p class="sample" style="margin:0 0 12px">Creates a one-time signup link that expires in 7 days. Nothing is emailed, so send it yourself in GroupMe, Slack or text.</p>
+      <label for="inv_email">Their email (optional)</label>
+      <input id="inv_email" name="email" type="email" placeholder="If set, only this email can use the link">
+      <label for="inv_role" style="margin-top:14px">Role</label>
+      <select id="inv_role" name="role">
+        <option value="member" selected>Member: view applicants</option>
+        <option value="admin">Admin: everything, manages members</option>
+      </select>
+      <div class="actions"><button class="btn primary" type="submit">Create invite link</button></div>
+    </form>
+
+    {% if invites %}
+    <div class="panel" style="margin-top:18px">
+      <h2>Open invites</h2>
+      <ul class="invites">
+      {% for i in invites %}
+        <li>
+          <div class="inv-head">
+            <span><b>{{ i.email or 'Anyone with the link' }}</b> <span class="role {{ i.role }}">{{ i.role }}</span></span>
+            <form method="post" action="/members/invites/{{ i.token }}/revoke">{{ csrf_field }}<button class="btn small danger" type="submit">Revoke</button></form>
+          </div>
+          <input class="linkfield" readonly value="{{ base }}/signup/{{ i.token }}" aria-label="Invite link" onclick="this.select()">
+          <span class="sample">Expires {{ i.expires_at|shortdate }}</span>
+        </li>
+      {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
