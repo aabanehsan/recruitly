@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 
-from sqlalchemy import DateTime, Float, ForeignKey, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Table, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
 
@@ -161,3 +161,38 @@ class Invite(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     used_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+
+slot_interviewers = Table(
+    "slot_interviewers", Base.metadata,
+    Column("slot_id", ForeignKey("interview_slots.id", ondelete="CASCADE"), primary_key=True),
+    Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
+class InterviewSlot(Base):
+    """One interview time. Holds at most one applicant; any number of interviewers.
+
+    `starts_at` is naive wall-clock time in the org's time zone (settings.timezone)."""
+
+    __tablename__ = "interview_slots"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    starts_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    minutes: Mapped[int] = mapped_column(Integer, default=30)
+    location: Mapped[str | None] = mapped_column(String(300))  # room, or a Zoom link
+    label: Mapped[str | None] = mapped_column(String(80))  # e.g. "First round"
+    applicant_id: Mapped[int | None] = mapped_column(ForeignKey("applicants.id", ondelete="SET NULL"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    applicant: Mapped[Applicant | None] = relationship(lazy="joined")
+    interviewers: Mapped[list[User]] = relationship(secondary=slot_interviewers, order_by=User.name, lazy="selectin")
+
+    @property
+    def ends_at(self) -> datetime:
+        return self.starts_at + timedelta(minutes=self.minutes)
+
+    @property
+    def interviewer_ids(self) -> set[int]:
+        return {u.id for u in self.interviewers}

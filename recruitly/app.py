@@ -20,6 +20,9 @@ from .accounts import register_account_routes
 from .config import settings
 from .db import get_session, init_db
 from .models import LONG_TEXT_FIELDS, PROFILE_FIELDS, Applicant, Status
+from .schedule import (
+    applicant_interviews, forget_applicant, next_interviews, now_local, open_upcoming_slots, register_schedule_routes,
+)
 from .services.cleaning import HEADER_KEYWORDS, MAJORS, clean_row
 from .services.headshots import HeadshotError, delete_headshot, match_zip, save_headshot
 from .services.importer import (
@@ -56,6 +59,7 @@ def create_app() -> FastAPI:
         return await http_exception_handler(request, exc)
 
     register_account_routes(app)
+    register_schedule_routes(app)
     register_routes(app)
     return app
 
@@ -103,6 +107,7 @@ def register_routes(app: FastAPI) -> None:
         return templates.TemplateResponse(request, "board.html", {
             "applicants": applicants, "counts": counts, "total": total, "majors": majors, "years": years,
             "f": {"q": q, "status": status, "major": major, "year": year, "sort": sort}, "msg": msg,
+            "next_interview": next_interviews(session),
         })
 
     @app.get("/headshots/{name}", dependencies=[Depends(current_user)])
@@ -126,14 +131,17 @@ def register_routes(app: FastAPI) -> None:
         return save_profile(request, session, None, raw)
 
     @app.get("/applicants/{applicant_id}", response_class=HTMLResponse, dependencies=[Depends(current_user)])
-    def profile(request: Request, applicant_id: int, msg: str = "", session: Session = Depends(get_session)):
+    def profile(request: Request, applicant_id: int, msg: str = "", error: str = "",
+                session: Session = Depends(get_session)):
         ap = get_applicant(session, applicant_id)
         ids = session.scalars(select(Applicant.id).order_by(Applicant.last_name, Applicant.first_name)).all()
         pos = ids.index(ap.id)
         nav = {"prev": ids[pos - 1] if pos > 0 else None, "next": ids[pos + 1] if pos + 1 < len(ids) else None,
                "pos": pos + 1, "total": len(ids)}
         return templates.TemplateResponse(request, "profile.html", {
-            "ap": ap, "fields": PROFILE_FIELDS, "long_fields": LONG_TEXT_FIELDS, "msg": msg, "nav": nav,
+            "ap": ap, "fields": PROFILE_FIELDS, "long_fields": LONG_TEXT_FIELDS, "msg": msg, "error": error, "nav": nav,
+            "interviews": applicant_interviews(session, ap.id), "now": now_local(),
+            "open_slots": open_upcoming_slots(session) if request.state.user.is_admin else [],
         })
 
     @app.get("/applicants/{applicant_id}/edit", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
@@ -188,6 +196,7 @@ def register_routes(app: FastAPI) -> None:
         name = ap.display_name
         if ap.headshot_path:
             delete_headshot(ap.headshot_path)
+        forget_applicant(session, ap.id)
         session.delete(ap)
         session.commit()
         return redirect("/", msg=f"Deleted {name}")

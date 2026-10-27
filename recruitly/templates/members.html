@@ -45,7 +45,7 @@
           </td>
           <td class="mact">
             {% if u.id != me.id %}
-            <form method="post" action="/members/{{ u.id }}/remove" onsubmit="return confirm('Remove {{ u.name|e }}? They won\'t be able to log in.')">{{ csrf_field }}
+            <form method="post" action="/members/{{ u.id }}/remove" onsubmit='return confirm({{ ("Remove " ~ u.name ~ "? They won’t be able to log in.")|tojson }})'>{{ csrf_field }}
               <button class="btn small danger" type="submit">Remove</button>
             </form>
             {% endif %}

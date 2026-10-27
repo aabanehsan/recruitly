@@ -8,7 +8,14 @@ Applicant tracking for student org recruitment. Point it at your Google Form res
 
 Most orgs run recruitment out of a Google Form and a messy spreadsheet. Names come in as `jOHN`, majors as `cs`, `comp sci` and `Computer Science`, phone numbers in five formats, and someone always submits twice. Headshots end up in a Drive folder that nobody can match to the right row. Recruitly fixes all of that on import and gives you a board you can actually run rush from.
 
-## Features (v0.2)
+## Features (v0.3)
+
+- **Interview scheduling.** Admins add interview slots (date, time, length, room or Zoom link, interviewers), several back-to-back slots at once.
+  - Book applicants from the **Schedule** page or from their profile. An applicant can't be in two overlapping slots, a slot holds one applicant, and interviewers can't be double booked.
+  - Booking someone who's still *Applied* moves them to **Interviewing** automatically.
+  - The schedule is grouped by day, with filters for *I'm interviewing* and *Open*. The board and profiles show each applicant's next interview.
+  - **Export to your calendar** as an `.ics` file, either every slot or just the ones you're interviewing in. It works with Google Calendar, Apple Calendar and Outlook.
+  - Members see the full schedule read-only. Only admins create, book or change slots.
 
 - **Accounts and roles.** Everyone logs in with their own email and password. **Admins** can do everything and manage the team; **members** can view the board and every profile, but can't change anything.
   - The first account, created on a one-time setup page, becomes the admin.
@@ -41,7 +48,7 @@ cd recruitly
 python3 run.py demo
 ```
 
-That one command sets up everything the first time, loads 12 sample form responses (fictional people, deliberately messy data), creates two demo logins, and opens the app at http://localhost:8000:
+That one command sets up everything the first time, loads 12 sample form responses (fictional people, deliberately messy data), creates two demo logins, adds two days of interview slots starting tomorrow with six applicants booked, and opens the app at http://localhost:8000:
 
 | Role | Email | Password |
 |---|---|---|
@@ -76,8 +83,16 @@ recruitly import responses.csv
 
 - **First run:** open the app and create the admin account. That page disappears once an account exists.
 - **Inviting:** Members → *Create invite link*, then send the link. Each link works once. If you fill in an email, only that address can sign up with it.
-- **Roles:** admins can import, edit, change statuses, upload headshots, export and manage members. Members can view applicants (notes and scoring arrive in v0.4). There's always at least one admin, and you can't demote or remove yourself.
+- **Roles:** admins can import, edit, change statuses, upload headshots, schedule interviews, export and manage members. Members can view applicants and the interview schedule and download calendar files (notes and scoring arrive in v0.4). There's always at least one admin, and you can't demote or remove yourself.
 - **Forgot a password?** Anyone can change their own on the account page. If someone is locked out, run `recruitly reset-password their@email.edu` on the machine running Recruitly. Changing a password signs that person out everywhere else.
+
+## Interviews
+
+1. On **Schedule**, fill in *Add interview slots*: pick the date, start time, length and how many back-to-back slots you want, a room or a Zoom/Meet link, and who's interviewing.
+2. Book applicants with the dropdown on each open slot, or from an applicant's profile (*Book an open slot*).
+3. Interviewers click **My interviews (.ics)** and open the file to add their slots to their calendar. If the schedule changes, download it again to pick up the new times.
+
+Times are in the org's time zone (`RECRUITLY_TIMEZONE`, Central time by default). Past slots are hidden unless you click *Show past*.
 
 ## Configuration
 
@@ -88,6 +103,7 @@ Set these as environment variables:
 | `RECRUITLY_ORG_NAME` | `Recruitly` | Name shown in the header |
 | `RECRUITLY_CYCLE` | `Fall Rush` | Recruitment cycle label |
 | `RECRUITLY_EMAIL_DOMAIN` | none | Warn when an email isn't on this domain, e.g. `utexas.edu` |
+| `RECRUITLY_TIMEZONE` | `America/Chicago` | Time zone interview slots are in, used for calendar export |
 | `RECRUITLY_DATA_DIR` | `./data` | Where the database and headshots live |
 | `RECRUITLY_DB_URL` | SQLite in the data dir | Any SQLAlchemy database URL |
 | `RECRUITLY_FETCH_HEADSHOTS` | `1` | Set to `0` to skip downloading headshots from Drive links |
@@ -106,10 +122,12 @@ Set these as environment variables:
 recruitly/
   app.py              applicant, import and headshot routes
   accounts.py         setup, login, invites, members, your account
+  schedule.py         interview slots, booking, .ics export
   web.py              templates, current user, admin check, CSRF
-  models.py           Applicant, ImportPreview, User, Invite
+  models.py           Applicant, ImportPreview, User, Invite, InterviewSlot
   services/
     auth.py           password hashing, roles, invite and login rules
+    scheduling.py     slot parsing, double-booking checks, .ics building
     cleaning.py       header mapping + field validation/cleanup
     importer.py       two-step import: preview, then apply
     headshots.py      Drive download, zip matching, crop/resize
@@ -123,7 +141,7 @@ Run the tests with `pip install -e ".[dev]" && pytest`.
 
 ## Roadmap
 
-Interview scheduling, scoring rubrics, voting, live Sheets sync and Docker are planned. See [ROADMAP.md](ROADMAP.md).
+Scoring rubrics, voting, live Sheets sync and Docker are planned. See [ROADMAP.md](ROADMAP.md).
 
 ## Privacy note
 

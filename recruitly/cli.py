@@ -78,6 +78,43 @@ def load_demo() -> None:
               f"{summary.skipped} rows skipped (bad data on purpose).")
 
 
+def load_demo_schedule() -> None:
+    """Add a couple of days of interview slots (starting tomorrow) and book some demo applicants."""
+    from datetime import timedelta
+
+    from sqlalchemy import select
+
+    from .db import init_db, session_scope
+    from .demo import DEMO_BOOKINGS, DEMO_SLOTS
+    from .models import Applicant, InterviewSlot, User
+    from .services.scheduling import local_now, parse_slot_input, status_after_booking
+
+    init_db()
+    with session_scope() as s:
+        if s.scalars(select(InterviewSlot.id).limit(1)).first() is not None:
+            return
+        users = {u.email: u for u in s.scalars(select(User))}
+        today = local_now(settings.timezone).date()
+        groups = []
+        for days, time, minutes, count, location, label, emails in DEMO_SLOTS:
+            day = (today + timedelta(days=days)).isoformat()
+            parsed, _ = parse_slot_input(day, time, str(minutes), location, label, str(count))
+            group = [InterviewSlot(starts_at=t, minutes=minutes, location=parsed.location, label=parsed.label,
+                                   interviewers=[users[e] for e in emails if e in users]) for t in parsed.starts]
+            s.add_all(group)
+            groups.append(group)
+        booked = 0
+        for email, g, i in DEMO_BOOKINGS:
+            ap = s.scalars(select(Applicant).where(Applicant.email == email)).first()
+            if ap is not None:
+                groups[g][i].applicant = ap
+                ap.status = status_after_booking(ap.status)
+                booked += 1
+        s.commit()
+        total = sum(len(g) for g in groups)
+        print(f"  Added demo schedule: {total} interview slots over the next 2 days, {booked} applicants booked.")
+
+
 def print_demo_accounts(accounts) -> None:
     if not accounts:
         return
@@ -173,6 +210,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "demo":
         load_demo()
         accounts = create_demo_accounts()
+        if accounts:
+            load_demo_schedule()
         print_demo_accounts(accounts)
         settings.demo = bool(accounts)
     serve(args.host, args.port, not args.no_browser)

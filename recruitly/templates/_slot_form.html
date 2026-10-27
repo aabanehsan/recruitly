@@ -1,0 +1,49 @@
+{% macro slot_fields(values, errors, users, lengths, repeat=False, max_repeat=16) -%}
+  <div class="sgrid">
+    <div>
+      <label for="s_date">Date</label>
+      <input id="s_date" name="date" type="date" value="{{ values.date }}" required>
+      {% if errors.date %}<div class="ferr">{{ errors.date }}</div>{% endif %}
+    </div>
+    <div>
+      <label for="s_time">Start time</label>
+      <input id="s_time" name="time" type="time" value="{{ values.time }}" step="300" required>
+      {% if errors.time %}<div class="ferr">{{ errors.time }}</div>{% endif %}
+    </div>
+    <div>
+      <label for="s_minutes">Length</label>
+      <select id="s_minutes" name="minutes">
+        {% set cur = values.minutes|string %}
+        {% if cur and cur not in lengths|map('string')|list %}<option value="{{ cur }}" selected>{{ cur }} min</option>{% endif %}
+        {% for m in lengths %}<option value="{{ m }}" {{ 'selected' if cur == m|string }}>{{ m }} min</option>{% endfor %}
+      </select>
+      {% if errors.minutes %}<div class="ferr">{{ errors.minutes }}</div>{% endif %}
+    </div>
+    {% if repeat %}
+    <div>
+      <label for="s_repeat">How many slots</label>
+      <input id="s_repeat" name="repeat" type="number" min="1" max="{{ max_repeat }}" value="{{ values.repeat or 1 }}" inputmode="numeric">
+      {% if errors.repeat %}<div class="ferr">{{ errors.repeat }}</div>{% else %}<div class="hint">Back to back from the start time.</div>{% endif %}
+    </div>
+    {% endif %}
+    <div class="full">
+      <label for="s_location">Location or video link</label>
+      <input id="s_location" name="location" value="{{ values.location or '' }}" placeholder="e.g. GSB 2.124 or https://utexas.zoom.us/j/...">
+      {% if errors.location %}<div class="ferr">{{ errors.location }}</div>{% endif %}
+    </div>
+    <div class="full">
+      <label for="s_label">Label (optional)</label>
+      <input id="s_label" name="label" value="{{ values.label or '' }}" placeholder="e.g. First round">
+      {% if errors.label %}<div class="ferr">{{ errors.label }}</div>{% endif %}
+    </div>
+    <fieldset class="full ivpick">
+      <legend>Interviewers</legend>
+      {% set chosen = values.interviewers|map('int')|list %}
+      {% for u in users %}
+        <label class="check"><input type="checkbox" name="interviewers" value="{{ u.id }}" {{ 'checked' if u.id in chosen }}>
+          <span class="mini">{{ u.initials }}</span>{{ u.name }}</label>
+      {% endfor %}
+      {% if errors.interviewers %}<div class="ferr">{{ errors.interviewers }}</div>{% endif %}
+    </fieldset>
+  </div>
+{%- endmacro %}

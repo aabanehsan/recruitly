@@ -2,6 +2,7 @@
 {% from "_macros.html" import photo, status_pill, issue_list %}
 {% block title %}{{ ap.display_name }}{% endblock %}
 {% block content %}
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
 <div class="headrow">
   <div>
     <h1>{{ ap.display_name }}</h1>
@@ -48,6 +49,41 @@
 
     {% endif %}
 
+    <div class="panel ivpanel">
+      <h2>Interviews</h2>
+      {% for s in interviews %}
+        {% set url = location_url(s.location) %}
+        <div class="ivrow{{ ' past' if s.ends_at <= now }}">
+          <b>{{ s.starts_at|slotday }} · {{ time_range(s.starts_at, s.minutes) }}</b>
+          <span class="sample">{% if url %}<a href="{{ url }}" target="_blank" rel="noopener noreferrer">Video call</a>{% else %}{{ s.location or 'Location TBD' }}{% endif %}{% if s.label %} · {{ s.label }}{% endif %}</span>
+          <span class="sample">{{ 'With ' ~ s.interviewers|map(attribute='name')|join(', ') if s.interviewers else 'No interviewers yet' }}</span>
+          {% if me.is_admin %}
+          <form method="post" action="/schedule/slots/{{ s.id }}/unbook">{{ csrf_field }}
+            <input type="hidden" name="next" value="/applicants/{{ ap.id }}">
+            <button class="btn small" type="submit">Unbook</button>
+          </form>
+          {% endif %}
+        </div>
+      {% else %}
+        <p class="sample" style="margin:0">Not scheduled yet.</p>
+      {% endfor %}
+      {% if me.is_admin %}
+        {% if open_slots %}
+        <form method="post" action="/applicants/{{ ap.id }}/book">{{ csrf_field }}
+          <label for="slot_pick">Book an open slot</label>
+          <div class="row">
+            <select id="slot_pick" name="slot_id" required>
+              {% for s in open_slots %}<option value="{{ s.id }}">{{ slot_choice_label(s.starts_at, s.minutes, s.location) }}</option>{% endfor %}
+            </select>
+            <button class="btn primary" type="submit">Book</button>
+          </div>
+        </form>
+        {% else %}
+        <p class="sample" style="margin:10px 0 0">No open slots. <a href="/schedule#add">Add some</a> on the schedule.</p>
+        {% endif %}
+      {% endif %}
+    </div>
+
     {% if ap.notes_list %}
     <details class="panel" style="padding:14px;margin-top:12px">
       <summary>Cleaned on import ({{ ap.notes_list|length }})</summary>
@@ -80,7 +116,7 @@
     </div>
     {% if me.is_admin %}
     <hr>
-    <form method="post" action="/applicants/{{ ap.id }}/delete" onsubmit="return confirm('Delete {{ ap.display_name|e }}? This can\'t be undone.')">{{ csrf_field }}
+    <form method="post" action="/applicants/{{ ap.id }}/delete" onsubmit='return confirm({{ ("Delete " ~ ap.display_name ~ "? This can’t be undone.")|tojson }})'>{{ csrf_field }}
       <button class="btn small danger" type="submit">Delete applicant</button>
     </form>
     {% endif %}

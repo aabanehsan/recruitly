@@ -15,6 +15,7 @@ PUBLIC = {
 ANY_MEMBER = {
     ("GET", "/"), ("GET", "/applicants/{applicant_id}"), ("GET", "/headshots/{name}"),
     ("GET", "/account"), ("POST", "/account/password"),
+    ("GET", "/schedule"), ("GET", "/schedule.ics"),
 }
 ADMIN_ONLY = {
     ("GET", "/applicants/new"), ("POST", "/applicants/new"),
@@ -26,6 +27,9 @@ ADMIN_ONLY = {
     ("GET", "/export.csv"),
     ("GET", "/members"), ("POST", "/members/invite"), ("POST", "/members/invites/{token}/revoke"),
     ("POST", "/members/{user_id}/role"), ("POST", "/members/{user_id}/remove"),
+    ("POST", "/schedule/slots"), ("GET", "/schedule/slots/{slot_id}/edit"), ("POST", "/schedule/slots/{slot_id}/edit"),
+    ("POST", "/schedule/slots/{slot_id}/delete"), ("POST", "/schedule/slots/{slot_id}/book"),
+    ("POST", "/schedule/slots/{slot_id}/unbook"), ("POST", "/applicants/{applicant_id}/book"),
 }
 
 
@@ -52,7 +56,7 @@ def test_every_route_has_an_access_rule(app):
 
 
 def test_anonymous_is_sent_to_login_everywhere(app, client, anon):
-    ids = {"applicant_id": add_applicant(client), "token": "x", "user_id": 1, "name": "x.jpg"}
+    ids = {"applicant_id": add_applicant(client), "token": "x", "user_id": 1, "name": "x.jpg", "slot_id": 1}
     anon.headers["X-CSRF-Token"] = csrf_of(anon)
     for method, path in sorted(ANY_MEMBER | ADMIN_ONLY):
         r = anon.request(method, fill(path, ids), follow_redirects=False)
@@ -63,7 +67,7 @@ def test_anonymous_is_sent_to_login_everywhere(app, client, anon):
 
 
 def test_members_can_view_but_not_change(app, client, member):
-    ids = {"applicant_id": add_applicant(client), "token": "x", "user_id": 1, "name": "x.jpg"}
+    ids = {"applicant_id": add_applicant(client), "token": "x", "user_id": 1, "name": "x.jpg", "slot_id": 1}
     for method, path in sorted(ADMIN_ONLY):
         r = member.request(method, fill(path, ids), follow_redirects=False)
         assert r.status_code == 403, (method, path, r.status_code)
@@ -80,7 +84,7 @@ def test_members_can_view_but_not_change(app, client, member):
 
 
 def test_admin_reaches_every_admin_route(app, client):
-    ids = {"applicant_id": add_applicant(client), "token": "x", "user_id": 999, "name": "x.jpg"}
+    ids = {"applicant_id": add_applicant(client), "token": "x", "user_id": 999, "name": "x.jpg", "slot_id": 999}
     for method, path in sorted(ADMIN_ONLY):
         r = client.request(method, fill(path, ids), follow_redirects=False)
         assert r.status_code != 403 and not is_login_redirect(r), (method, path, r.status_code)
@@ -105,7 +109,7 @@ def test_post_without_csrf_token_is_rejected(client):
 def test_every_post_form_has_a_csrf_field(client):
     ap_id = add_applicant(client)
     for url in ["/", f"/applicants/{ap_id}", f"/applicants/{ap_id}/edit", "/applicants/new", "/import",
-                "/headshots-bulk", "/members", "/account"]:
+                "/headshots-bulk", "/members", "/account", "/schedule"]:
         html = client.get(url).text
         forms = re.findall(r"<form\b[^>]*method=\"post\"[^>]*>(.*?)</form>", html, flags=re.S)
         assert forms, url  # at least the logout form

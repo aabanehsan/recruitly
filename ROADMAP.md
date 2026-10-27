@@ -8,9 +8,9 @@ Recruitly ships in small, working releases. Each milestone below is one release:
 
 - [x] **v0.2: Accounts and roles.** Login with email + password (hash with `argon2-cffi` or `passlib[bcrypt]`), signed session cookies. Roles: `admin` (everything, manages members), `member` (view applicants, later: leave notes and scores). First account created on first run becomes admin (setup page). Admin page to invite members via a one-time signup link. Protect every route; add CSRF tokens to all POST forms. Tests for access control on each route.
 
-## Next
+- [x] **v0.3: Interview scheduling.** Admins create interview slots (date, time, length, location or Zoom link, interviewers). Assign applicants to slots from the profile page or a schedule view; prevent double booking of applicants and interviewers. Schedule page grouped by day. Export a slot list as `.ics` so interviewers can add it to their calendars. Status moves to "Interviewing" automatically when someone is scheduled.
 
-- [ ] **v0.3: Interview scheduling.** Admins create interview slots (date, time, length, location or Zoom link, interviewers). Assign applicants to slots from the profile page or a schedule view; prevent double booking of applicants and interviewers. Schedule page grouped by day. Export a slot list as `.ics` so interviewers can add it to their calendars. Status moves to "Interviewing" automatically when someone is scheduled.
+## Next
 
 - [ ] **v0.4: Notes and scoring rubric.** Admins define a rubric (criteria with 1-5 scales and weights). Members leave a score sheet and written notes per applicant per round. A profile shows each member's scores, the weighted average, and notes. Members can't see others' scores until they submit their own, to avoid anchoring. Board can sort by average score.
 

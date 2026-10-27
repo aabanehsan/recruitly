@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_slot_form.html" import slot_fields %}
+{% block title %}Edit slot{% endblock %}
+{% block content %}
+<h1>Edit interview slot</h1>
+<p class="sub">{{ slot_choice_label(slot.starts_at, slot.minutes, slot.location) }}{% if slot.applicant %} · booked: <a href="/applicants/{{ slot.applicant.id }}">{{ slot.applicant.display_name }}</a>{% endif %}</p>
+{% if errors %}<div class="flash err">Not saved. Fix the highlighted fields and try again.</div>{% endif %}
+<form class="panel narrow" method="post" action="/schedule/slots/{{ slot.id }}/edit">{{ csrf_field }}
+  {{ slot_fields(values, errors, users, lengths) }}
+  <div class="actions">
+    <button class="btn primary" type="submit">Save slot</button>
+    <a class="btn" href="/schedule#slot-{{ slot.id }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

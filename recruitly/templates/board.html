@@ -55,6 +55,8 @@
       <div class="name">{{ ap.display_name }}</div>
       <div class="meta">{{ ap.major or 'Major not listed' }}{% if ap.second_major %} + {{ ap.second_major }}{% endif %}</div>
       <div class="meta">{{ ap.classification or '' }}{% if ap.classification and ap.grad_term %} · {% endif %}{{ ap.grad_term or '' }}</div>
+      {% set iv = next_interview.get(ap.id) %}
+      {% if iv %}<div class="meta ivline">Interview {{ iv.starts_at|slotday }}, {{ clock(iv.starts_at) }}</div>{% endif %}
       <div class="foot">{{ status_pill(ap.status) }}{% if ap.gpa %}<span class="meta">{{ '%.2f'|format(ap.gpa) }}</span>{% endif %}</div>
     </div>
   </a>

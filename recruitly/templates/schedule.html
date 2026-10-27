@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% from "_macros.html" import photo, status_pill %}
+{% from "_slot_form.html" import slot_fields %}
+{% block title %}Schedule{% endblock %}
+{% block content %}
+<div class="headrow">
+  <div>
+    <h1>Interview schedule</h1>
+    <p class="sub" style="margin:0">{{ counts.all }} upcoming slot{{ '' if counts.all == 1 else 's' }} · {{ booked }} booked · {{ counts.open }} open · times in {{ tz.replace('_', ' ') }}</p>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    {% if counts.mine %}<a class="btn" href="/schedule.ics?mine=1">My interviews (.ics)</a>{% endif %}
+    {% if counts.all %}<a class="btn" href="/schedule.ics">All slots (.ics)</a>{% endif %}
+    {% if me.is_admin %}<a class="btn primary" href="#add">Add slots</a>{% endif %}
+  </div>
+</div>
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+{% if errors %}<div class="flash err">Those slots weren't added. Fix the highlighted fields and try again.</div>{% endif %}
+
+<div class="chips">
+  {% set pq = '&past=1' if past else '' %}
+  <a class="chip {{ 'on' if view == 'all' }}" href="/schedule?view=all{{ pq }}">All<b>{{ counts.all }}</b></a>
+  <a class="chip {{ 'on' if view == 'mine' }}" href="/schedule?view=mine{{ pq }}">I'm interviewing<b>{{ counts.mine }}</b></a>
+  <a class="chip {{ 'on' if view == 'open' }}" href="/schedule?view=open{{ pq }}">Open<b>{{ counts.open }}</b></a>
+  {% if past_count %}
+  <a class="chip {{ 'on' if past }}" href="/schedule?view={{ view }}{{ '' if past else '&past=1' }}">{{ 'Hide' if past else 'Show' }} past<b>{{ past_count }}</b></a>
+  {% endif %}
+</div>
+
+<div class="{{ 'sched' if me.is_admin else '' }}">
+  <div class="daylist">
+  {% for d, slots in days %}
+    <section class="day">
+      <h2 class="dayh">{{ day_label(d, today) }} <span class="sample">{{ slots|length }} slot{{ '' if slots|length == 1 else 's' }}</span></h2>
+      <div class="slots">
+      {% for s in slots %}
+        {% set url = location_url(s.location) %}
+        <div class="slot {{ 'booked' if s.applicant else 'open' }}{{ ' past' if s.ends_at <= now }}" id="slot-{{ s.id }}">
+          <div class="when">
+            <b>{{ time_range(s.starts_at, s.minutes) }}</b>
+            <span class="sample">{{ s.minutes }} min{% if s.label %} · {{ s.label }}{% endif %}</span>
+          </div>
+          <div class="where">
+            {% if url %}<a href="{{ url }}" target="_blank" rel="noopener noreferrer">Join video call</a>
+            {% elif s.location %}<span>{{ s.location }}</span>
+            {% else %}<span class="sample">Location TBD</span>{% endif %}
+            <div class="ivs">
+              {% for u in s.interviewers %}<span class="iv{{ ' me' if u.id == me.id }}"><span class="mini">{{ u.initials }}</span>{{ u.name }}</span>
+              {% else %}<span class="sample">No interviewers yet</span>{% endfor %}
+            </div>
+          </div>
+          <div class="cand">
+            {% if s.applicant %}
+              <a class="person" href="/applicants/{{ s.applicant.id }}">{{ photo(s.applicant, small=True) }}
+                <span><b>{{ s.applicant.display_name }}</b><br><span class="sample">{{ s.applicant.major or 'Major not listed' }}</span></span></a>
+              {{ status_pill(s.applicant.status) }}
+            {% else %}
+              <span class="openlbl">Open</span>
+            {% endif %}
+          </div>
+          {% if me.is_admin %}
+          <div class="sact">
+            {% if s.applicant %}
+              <form method="post" action="/schedule/slots/{{ s.id }}/unbook">{{ csrf_field }}
+                <input type="hidden" name="next" value="/schedule?view={{ view }}{{ pq }}#slot-{{ s.id }}">
+                <button class="btn small" type="submit">Unbook</button></form>
+            {% else %}
+              <form method="post" action="/schedule/slots/{{ s.id }}/book" class="bookform">{{ csrf_field }}
+                <input type="hidden" name="next" value="/schedule?view={{ view }}{{ pq }}#slot-{{ s.id }}">
+                <select name="applicant_id" aria-label="Applicant to book at {{ clock(s.starts_at) }}" required>
+                  <option value="">Choose applicant…</option>
+                  {% for a in bookable %}
+                    {% set b = booked_at.get(a.id) %}
+                    <option value="{{ a.id }}">{{ a.display_name }}{% if b %} (booked {{ b.starts_at|slotday }} {{ clock(b.starts_at) }}){% endif %}</option>
+                  {% endfor %}
+                </select>
+                <button class="btn small primary" type="submit">Book</button>
+              </form>
+            {% endif %}
+            <a class="btn small" href="/schedule/slots/{{ s.id }}/edit">Edit</a>
+            <form method="post" action="/schedule/slots/{{ s.id }}/delete" onsubmit='return confirm({{ ("Delete this slot?" ~ (" " ~ s.applicant.display_name ~ " will be unbooked." if s.applicant else ""))|tojson }})'>{{ csrf_field }}
+              <button class="btn small danger" type="submit">Delete</button></form>
+          </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+      </div>
+    </section>
+  {% else %}
+    <div class="panel empty">
+      {% if view == 'mine' %}<h2>You're not interviewing anyone yet</h2><p>When an admin adds you to a slot, it shows up here.</p>
+      {% elif view == 'open' %}<h2>No open slots</h2><p>Every upcoming slot has someone booked.</p>
+      {% else %}<h2>No interview slots yet</h2>
+        <p>{{ 'Add slots on the right, then book applicants from here or from their profile.' if me.is_admin else 'An admin hasn\'t added any interview times yet.' }}</p>
+      {% endif %}
+    </div>
+  {% endfor %}
+  </div>
+
+  {% if me.is_admin %}
+  <aside>
+    <form class="panel" id="add" method="post" action="/schedule/slots">{{ csrf_field }}
+      <h2>Add interview slots</h2>
+      <p class="sample" style="margin:0 0 14px">Interviewers can't be double booked; Recruitly checks every slot they're already in.</p>
+      {{ slot_fields(values, errors, users, lengths, repeat=True, max_repeat=max_repeat) }}
+      <div class="actions"><button class="btn primary" type="submit">Add slots</button></div>
+    </form>
+  </aside>
+  {% endif %}
+</div>
+{% endblock %}

@@ -19,6 +19,8 @@ class Settings:
     fetch_headshots: bool = field(default_factory=lambda: os.environ.get("RECRUITLY_FETCH_HEADSHOTS", "1") != "0")
     # Set to "1" when serving over HTTPS so session cookies are only sent securely
     secure_cookies: bool = field(default_factory=lambda: os.environ.get("RECRUITLY_SECURE_COOKIES", "0") == "1")
+    # Time zone interview slots are scheduled in (used for .ics export and "upcoming")
+    timezone: str = field(default_factory=lambda: os.environ.get("RECRUITLY_TIMEZONE", "America/Chicago"))
     # Set by `recruitly demo` so the login page can show the demo accounts
     demo: bool = field(default_factory=lambda: os.environ.get("RECRUITLY_DEMO", "0") == "1")
 
