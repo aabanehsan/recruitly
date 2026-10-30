@@ -92,6 +92,8 @@
     {% endif %}
   </aside>
 
+  <div class="maincol">
+  {% include "_scores.html" %}
   <section class="panel">
     <dl class="kv">
       {% for key, label in fields if key not in long_fields and key not in ('first_name', 'last_name', 'preferred_name') %}
@@ -121,5 +123,6 @@
     </form>
     {% endif %}
   </section>
+  </div>
 </div>
 {% endblock %}

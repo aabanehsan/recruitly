@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "recruitly"
-version = "0.3.0"
+version = "0.4.0"
 description = "Applicant tracking for student org recruitment: import Google Form responses, clean them up, and manage applicant profiles."
 readme = "README.md"
 license = { text = "MIT" }

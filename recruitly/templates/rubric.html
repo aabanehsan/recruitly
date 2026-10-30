@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}Rubric{% endblock %}
+{% macro err(key) -%}{% if errors.get(key) %}<div class="ferr">{{ errors[key] }}</div>{% endif %}{%- endmacro %}
+{% block content %}
+<div class="headrow">
+  <div>
+    <h1>Scoring rubric</h1>
+    <p class="sub" style="margin:0">Every criterion is scored 1 to 5. A sheet's score is the weighted average of its criteria.
+      {% if not me.is_admin %}Only admins can change the rubric.{% endif %}</p>
+  </div>
+</div>
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+{% if errors %}<div class="flash err">That wasn't saved. Fix the highlighted field and try again.</div>{% endif %}
+
+<div class="rubricgrid">
+  <section>
+    {% if crits %}
+    <ol class="crits">
+      {% for c in crits %}
+      <li class="crit" id="c{{ c.id }}">
+        <div class="crit-head">
+          <div class="crit-name">
+            <b>{{ c.name }}</b>
+            {% if c.description %}<span class="sample">{{ c.description }}</span>{% endif %}
+          </div>
+          <div class="crit-weight" title="Weight {{ '%g'|format(c.weight) }}">
+            <span class="wbar"><span style="width: {{ shares[c.id] }}%"></span></span>
+            <span class="sample"><b>×{{ '%g'|format(c.weight) }}</b> · {{ shares[c.id] }}%</span>
+          </div>
+        </div>
+        {% if me.is_admin %}
+        {% set editing = form == 'c' ~ c.id %}
+        <details class="crit-edit" {{ 'open' if editing }}>
+          <summary>Edit</summary>
+          <form method="post" action="/rubric/criteria/{{ c.id }}/edit" class="sgrid">{{ csrf_field }}
+            <div><label for="n{{ c.id }}">Name</label>
+              <input id="n{{ c.id }}" name="name" value="{{ values.name if editing else c.name }}" maxlength="60" required>
+              {% if editing %}{{ err('name') }}{% endif %}</div>
+            <div><label for="w{{ c.id }}">Weight</label>
+              <input id="w{{ c.id }}" name="weight" value="{{ values.weight if editing else '%g'|format(c.weight) }}" inputmode="decimal">
+              {% if editing %}{{ err('weight') }}{% endif %}</div>
+            <div class="full"><label for="d{{ c.id }}">What to look for <span class="sample">(optional)</span></label>
+              <input id="d{{ c.id }}" name="description" value="{{ values.description if editing else (c.description or '') }}" maxlength="300">
+              {% if editing %}{{ err('description') }}{% endif %}</div>
+            <div class="full crit-actions">
+              <button class="btn primary small" type="submit">Save</button>
+            </div>
+          </form>
+          <div class="crit-actions">
+            {% if not loop.first %}
+            <form method="post" action="/rubric/criteria/{{ c.id }}/move">{{ csrf_field }}<input type="hidden" name="direction" value="up"><button class="btn small" type="submit" aria-label="Move {{ c.name }} up">↑ Up</button></form>
+            {% endif %}
+            {% if not loop.last %}
+            <form method="post" action="/rubric/criteria/{{ c.id }}/move">{{ csrf_field }}<input type="hidden" name="direction" value="down"><button class="btn small" type="submit" aria-label="Move {{ c.name }} down">↓ Down</button></form>
+            {% endif %}
+            <form method="post" action="/rubric/criteria/{{ c.id }}/delete"
+                  onsubmit='return confirm({{ ("Remove " ~ c.name ~ "?" ~ (" Its " ~ scored.get(c.id) ~ " scores will be deleted." if scored.get(c.id) else ""))|tojson }})'>{{ csrf_field }}
+              <button class="btn small danger" type="submit">Remove</button>
+            </form>
+          </div>
+        </details>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <div class="panel empty">
+      <h2>No rubric yet</h2>
+      {% if me.is_admin %}
+      <p>Add the criteria your team scores interviews on, like Communication, Leadership or Fit.</p>
+      {% else %}
+      <p>An admin hasn't set up the rubric yet. You can still leave notes on applicants.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="panel scale">
+      <h2>The scale</h2>
+      <ol class="scalelist">
+        {% for n in SCALE %}<li><span class="sbox s{{ n }}">{{ n }}</span> {{ SCALE_LABELS[n] }}</li>{% endfor %}
+      </ol>
+      <p class="sample" style="margin:10px 0 0">Nobody sees anyone else's scores or notes for an applicant until they've submitted their own sheet for that round, so first impressions stay independent.</p>
+    </div>
+  </section>
+
+  {% if me.is_admin %}
+  <aside>
+    <form method="post" action="/rubric/criteria" class="panel" id="add">{{ csrf_field }}
+      <h2>Add a criterion</h2>
+      {% set mine = form == 'new' %}
+      <div class="sgrid">
+        <div class="full"><label for="cname">Name</label>
+          <input id="cname" name="name" value="{{ values.name if mine else '' }}" maxlength="60" placeholder="Communication" required>
+          {% if mine %}{{ err('name') }}{% endif %}</div>
+        <div class="full"><label for="cdesc">What to look for <span class="sample">(optional)</span></label>
+          <input id="cdesc" name="description" value="{{ values.description if mine else '' }}" maxlength="300" placeholder="Clear, concise answers; listens to the question">
+          {% if mine %}{{ err('description') }}{% endif %}</div>
+        <div><label for="cweight">Weight</label>
+          <input id="cweight" name="weight" value="{{ values.weight if mine else '1' }}" inputmode="decimal">
+          {% if mine %}{{ err('weight') }}{% else %}<div class="hint">0.5 to 10. A 2 counts twice as much as a 1.</div>{% endif %}</div>
+      </div>
+      <div class="actions" style="margin-top:14px"><button class="btn primary" type="submit">Add criterion</button></div>
+    </form>
+
+    <div class="panel" style="margin-top:14px">
+      <h2>Rounds</h2>
+      <p class="sample" style="margin:-6px 0 10px">Members fill in one sheet per applicant per round. Name rounds like your interview slot labels and the score page picks the right one.</p>
+      <ul class="roundlist">
+        {% for r in rounds %}
+        {% set editing = form == 'r' ~ r.id %}
+        <li>
+          <form method="post" action="/rubric/rounds/{{ r.id }}/edit" class="row">{{ csrf_field }}
+            <input name="name" value="{{ values.round if editing else r.name }}" aria-label="Round name" maxlength="40">
+            <button class="btn small" type="submit">Rename</button>
+          </form>
+          {% if editing %}{{ err('round') }}{% endif %}
+          <div class="roundmeta">
+            <span class="sample">{{ sheet_counts.get(r.id, 0) }} sheet{{ '' if sheet_counts.get(r.id, 0) == 1 else 's' }}</span>
+            {% if not sheet_counts.get(r.id) and rounds|length > 1 %}
+            <form method="post" action="/rubric/rounds/{{ r.id }}/delete">{{ csrf_field }}<button class="linkbtn danger" type="submit">Delete</button></form>
+            {% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      <form method="post" action="/rubric/rounds" class="row" style="margin-top:10px">{{ csrf_field }}
+        <input name="name" value="{{ values.round if form == 'round' else '' }}" placeholder="Add a round, e.g. Group interview" aria-label="New round name" maxlength="40">
+        <button class="btn small" type="submit">Add</button>
+      </form>
+      {% if form == 'round' %}{{ err('round') }}{% endif %}
+    </div>
+  </aside>
+  {% else %}
+  <aside>
+    <div class="panel">
+      <h2>Rounds</h2>
+      <ul class="roundlist">
+        {% for r in rounds %}<li><b>{{ r.name }}</b> <span class="sample">· {{ sheet_counts.get(r.id, 0) }} sheets</span></li>{% endfor %}
+      </ul>
+    </div>
+  </aside>
+  {% endif %}
+</div>
+{% endblock %}

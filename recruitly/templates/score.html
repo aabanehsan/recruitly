@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "_macros.html" import photo, status_pill %}
+{% block title %}Score {{ ap.display_name }}{% endblock %}
+{% block content %}
+<div class="headrow">
+  <div class="person scorehead">
+    {{ photo(ap, small=True) }}
+    <div>
+      <h1>Score {{ ap.display_name }}</h1>
+      <p class="sub" style="margin:0">{{ status_pill(ap.status) }}
+        <span class="meta"> · {{ ap.major or 'Major not listed' }}{% if ap.classification %} · {{ ap.classification }}{% endif %}</span></p>
+    </div>
+  </div>
+  <a class="btn" href="/applicants/{{ ap.id }}">Back to profile</a>
+</div>
+
+{% if errors %}<div class="flash err">{{ errors.get('action') or "That wasn't saved. Check the highlighted fields." }}</div>{% endif %}
+
+<div class="chips" role="tablist" aria-label="Round">
+  {% for r in rounds %}
+    {% set s = mine.get(r.id) %}
+    <a class="chip {{ 'on' if r.id == round.id }}" href="/applicants/{{ ap.id }}/score?round={{ r.id }}">{{ r.name }}{% if s %}<b>{{ '✓' if s.submitted else 'draft' }}</b>{% endif %}</a>
+  {% endfor %}
+</div>
+
+<form method="post" action="/applicants/{{ ap.id }}/score" class="panel sheet">{{ csrf_field }}
+  <input type="hidden" name="round_id" value="{{ round.id }}">
+  <div class="sheet-status">
+    {% if sheet and sheet.submitted %}
+      <span class="pill offered">Submitted {{ sheet.submitted_at|shortdate }}</span>
+      <span class="sample">Your score: <b class="avg {{ score_band(total) }}">{{ fmt_score(total) }}</b>. You can still change it.</span>
+    {% elif sheet %}
+      <span class="pill interviewing">Draft</span>
+      <span class="sample">Only you can see this until you submit.</span>
+    {% else %}
+      <span class="sample">Score each criterion from 1 ({{ SCALE_LABELS[1]|lower }}) to 5 ({{ SCALE_LABELS[5]|lower }}). Others' scores stay hidden from you until you submit, and yours from them.</span>
+    {% endif %}
+  </div>
+
+  {% for c in crits %}
+  {% set key = 'score_' ~ c.id %}
+  <fieldset class="crit-score{{ ' bad' if errors.get(key) }}">
+    <legend><b>{{ c.name }}</b> <span class="sample">×{{ '%g'|format(c.weight) }} · {{ shares[c.id] }}%</span></legend>
+    {% if c.description %}<p class="sample" style="margin:0 0 8px">{{ c.description }}</p>{% endif %}
+    <div class="seg" role="radiogroup" aria-label="{{ c.name }}">
+      {% for n in SCALE %}
+      <label class="segopt"><input type="radio" name="{{ key }}" value="{{ n }}" {{ 'checked' if values.get(key) == n|string }}>
+        <span><b>{{ n }}</b><small>{{ SCALE_LABELS[n] }}</small></span></label>
+      {% endfor %}
+    </div>
+    {% if errors.get(key) %}<div class="ferr">{{ errors[key] }}</div>{% endif %}
+  </fieldset>
+  {% else %}
+  <p class="sample">There's no rubric yet{% if me.is_admin %} (<a href="/rubric">set one up</a>){% endif %}, so this sheet is just notes.</p>
+  {% endfor %}
+
+  <label for="notes" style="margin-top:6px">Notes</label>
+  <textarea id="notes" name="notes" rows="6" maxlength="{{ max_notes }}" placeholder="What stood out? Strengths, concerns, follow-up questions for the next round.">{{ values.get('notes', '') }}</textarea>
+  {% if errors.get('notes') %}<div class="ferr">{{ errors.notes }}</div>{% endif %}
+
+  <div class="actions">
+    <button class="btn primary" type="submit" name="action" value="submit">{{ 'Save changes' if sheet and sheet.submitted else 'Submit scores' }}</button>
+    {% if not (sheet and sheet.submitted) %}<button class="btn" type="submit" name="action" value="draft">Save draft</button>{% endif %}
+    <a class="btn" href="/applicants/{{ ap.id }}">Cancel</a>
+  </div>
+</form>
+{% if sheet %}
+<form method="post" action="/applicants/{{ ap.id }}/score/delete" style="margin-top:12px"
+      onsubmit='return confirm({{ ("Delete your " ~ round.name ~ " sheet for this applicant?")|tojson }})'>{{ csrf_field }}
+  <input type="hidden" name="round_id" value="{{ round.id }}">
+  <button class="btn small danger" type="submit">Delete my {{ round.name }} sheet</button>
+</form>
+{% endif %}
+{% endblock %}

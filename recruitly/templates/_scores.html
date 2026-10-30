@@ -1,0 +1,84 @@
+{# Scores panel on the profile. `sc` comes from scoring.profile_scores and is already filtered:
+   other people's sheets are only in a block once the viewer may see them. #}
+{% macro sheet_card(s, total, label=None) -%}
+  <div class="sheetcard">
+    <div class="sheetcard-head">
+      <span class="mini">{{ s.user.initials if s.user else '?' }}</span>
+      <b>{{ label or (s.user.name if s.user else 'Former member') }}</b>
+      {% if s.submitted %}<b class="avg {{ score_band(total) }}">{{ fmt_score(total) }}</b>
+      {% else %}<span class="pill interviewing">Draft</span>{% endif %}
+    </div>
+    {% if sc.crits %}
+    <ul class="scorechips">
+      {% for c in sc.crits %}{% set v = s.score_map.get(c.id) %}
+      <li><span>{{ c.name }}</span><b class="sbox s{{ v or 0 }}">{{ v or '–' }}</b></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if s.notes %}<p class="sheetnotes">{{ s.notes }}</p>{% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro round_stats(b) -%}
+  {% if sc.crits and b.summary.submitted %}
+  <ul class="critavgs">
+    {% for st in b.summary.per_criterion %}{% set c = sc.crits[loop.index0] %}
+    <li><span class="sample">{{ c.name }}</span>
+      <span class="wbar"><span style="width: {{ ((st.average or 0) / 5 * 100)|round|int }}%"></span></span>
+      <b>{{ fmt_score(st.average) }}</b></li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+{%- endmacro %}
+
+{% macro others(b) -%}
+  {% for s, total in b.others %}{{ sheet_card(s, total) }}{% endfor %}
+{%- endmacro %}
+
+<section class="panel scores" id="scores">
+  <div class="scores-head">
+    <h2>Scores</h2>
+    {% if sc.overall is not none %}
+      <span class="sample"><b class="avg big {{ score_band(sc.overall) }}">{{ fmt_score(sc.overall) }}</b>
+        average of {{ sc.overall_count }} sheet{{ '' if sc.overall_count == 1 else 's' }}{% if not me.is_admin %} you can see{% endif %}</span>
+    {% endif %}
+  </div>
+
+  {% for b in sc.blocks %}
+  {% set mine = b.mine %}
+  <div class="roundblock">
+    <div class="roundhead">
+      <h3>{{ b.round.name }}</h3>
+      <span class="sample">{{ b.summary.submitted }} submitted</span>
+      {% if b.unlocked and not b.admin_peek and b.summary.average is not none %}
+        <span class="sample">· avg <b class="avg {{ score_band(b.summary.average) }}">{{ fmt_score(b.summary.average) }}</b></span>
+      {% endif %}
+      <a class="btn small {{ '' if mine and mine.submitted else 'primary' }}" href="/applicants/{{ ap.id }}/score?round={{ b.round.id }}">
+        {{ 'Edit my scores' if mine and mine.submitted else 'Finish my draft' if mine else 'Score' }}</a>
+    </div>
+
+    {% if b.unlocked and not b.admin_peek %}{{ round_stats(b) }}{% endif %}
+    {% if mine %}{{ sheet_card(mine, b.mine_total, me.name ~ ' (you)') }}{% endif %}
+
+    {% if b.admin_peek %}
+      {% if b.summary.submitted %}
+      <details class="peek">
+        <summary>Show {{ b.summary.submitted }} score{{ '' if b.summary.submitted == 1 else 's' }}</summary>
+        <p class="sample" style="margin:6px 0 0">You haven't submitted your own {{ b.round.name }} sheet. If you interviewed this applicant, score them first so you aren't anchored.</p>
+        {{ round_stats(b) }}
+        {{ others(b) }}
+      </details>
+      {% endif %}
+    {% elif b.unlocked %}
+      {{ others(b) }}
+    {% elif b.summary.submitted %}
+      <p class="locked">{{ b.summary.submitted }} {{ 'person has' if b.summary.submitted == 1 else 'people have' }} scored this round. Submit your own scores to see theirs.</p>
+    {% elif not mine %}
+      <p class="sample" style="margin:4px 0 0">Nobody has scored this round yet.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% if not sc.has_rubric %}
+  <p class="sample" style="margin:10px 0 0">No rubric yet, so sheets are notes only.{% if me.is_admin %} <a href="/rubric">Set up the rubric</a>.{% endif %}</p>
+  {% endif %}
+</section>

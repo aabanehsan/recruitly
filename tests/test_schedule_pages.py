@@ -257,7 +257,7 @@ def test_members_see_the_schedule_read_only(client, member):
 def test_demo_schedule(app, capsys):
     from recruitly.cli import create_demo_accounts, load_demo, load_demo_schedule
     from recruitly.db import session_scope
-    from recruitly.demo import DEMO_BOOKINGS, DEMO_SLOTS
+    from recruitly.demo import DEMO_ADVANCED, DEMO_BOOKINGS, DEMO_SLOTS
     from recruitly.models import Applicant, InterviewSlot
 
     load_demo()
@@ -270,6 +270,7 @@ def test_demo_schedule(app, capsys):
         booked = [x for x in all_slots if x.applicant_id]
         assert len(booked) == len(DEMO_BOOKINGS)
         assert all(x.interviewers for x in all_slots)
-        assert {x.applicant.status for x in booked} == {"interviewing"}
+        assert {x.applicant.status for x in booked if x.applicant.email not in DEMO_ADVANCED} == {"interviewing"}
+        assert {x.applicant.status for x in booked if x.applicant.email in DEMO_ADVANCED} == {"final_round"}
         assert s.query(Applicant).filter_by(status="applied").count() > 0
     assert "Added demo schedule" in capsys.readouterr().out

@@ -8,7 +8,15 @@ Applicant tracking for student org recruitment. Point it at your Google Form res
 
 Most orgs run recruitment out of a Google Form and a messy spreadsheet. Names come in as `jOHN`, majors as `cs`, `comp sci` and `Computer Science`, phone numbers in five formats, and someone always submits twice. Headshots end up in a Drive folder that nobody can match to the right row. Recruitly fixes all of that on import and gives you a board you can actually run rush from.
 
-## Features (v0.3)
+## Features (v0.4)
+
+- **Scoring rubric and notes.** Admins set up the rubric on the **Rubric** page: criteria like Communication or Fit, each scored 1 to 5, with a weight (a 2 counts twice as much as a 1) and an optional "what to look for" line. Rounds (First round, Final round, or your own) get separate score sheets.
+  - Everyone on the team fills in a **score sheet** per applicant per round: a 1-5 score for each criterion plus written notes. Save a draft and finish it later, or submit it. Submitted sheets can still be edited.
+  - **No anchoring:** you can't see anyone else's scores or notes for an applicant in a round until you've submitted your own. Drafts are only ever visible to the person writing them. Admins can look before scoring (they run deliberations), but other people's scores stay folded away until they choose to open them.
+  - Profiles show each member's scores and notes, the weighted score of every sheet, per-criterion averages for the round, and the applicant's overall average.
+  - The board shows each applicant's average and can **sort by score**. Members only see averages for applicants they've scored, so the board can't anchor them either.
+  - The score sheet opens on the round that matches the applicant's latest interview slot label.
+  - Removing a member keeps their sheets (shown as "Former member"); editing the rubric re-weights every average.
 
 - **Interview scheduling.** Admins add interview slots (date, time, length, room or Zoom link, interviewers), several back-to-back slots at once.
   - Book applicants from the **Schedule** page or from their profile. An applicant can't be in two overlapping slots, a slot holds one applicant, and interviewers can't be double booked.
@@ -48,14 +56,14 @@ cd recruitly
 python3 run.py demo
 ```
 
-That one command sets up everything the first time, loads 12 sample form responses (fictional people, deliberately messy data), creates two demo logins, adds two days of interview slots starting tomorrow with six applicants booked, and opens the app at http://localhost:8000:
+That one command sets up everything the first time, loads 12 sample form responses (fictional people, deliberately messy data), creates two demo logins, adds interview slots (yesterday's first round plus two days starting tomorrow), a four-criterion rubric with score sheets from yesterday's interviews, and opens the app at http://localhost:8000:
 
 | Role | Email | Password |
 |---|---|---|
 | Admin | `admin@demo.recruitly.dev` | `demo-admin-2026` |
 | Member | `member@demo.recruitly.dev` | `demo-member-2026` |
 
-They're printed in the terminal and shown on the login page too. Log in as the member to see the read-only view.
+They're printed in the terminal and shown on the login page too. Log in as the member to see the read-only view and the anchoring rule: Morgan can see everyone's scores for Danny and Grace (Morgan scored them) but not for Mateo, and Aisha still has an unfinished draft.
 
 Use `python3 run.py` without `demo` to start fresh: the first page asks you to create the admin account, then you invite the rest of your exec team from **Members**.
 
@@ -83,7 +91,7 @@ recruitly import responses.csv
 
 - **First run:** open the app and create the admin account. That page disappears once an account exists.
 - **Inviting:** Members → *Create invite link*, then send the link. Each link works once. If you fill in an email, only that address can sign up with it.
-- **Roles:** admins can import, edit, change statuses, upload headshots, schedule interviews, export and manage members. Members can view applicants and the interview schedule and download calendar files (notes and scoring arrive in v0.4). There's always at least one admin, and you can't demote or remove yourself.
+- **Roles:** admins can import, edit, change statuses, upload headshots, schedule interviews, export and manage members. Members can view applicants and the interview schedule, download calendar files, and fill in their own score sheets. There's always at least one admin, and you can't demote or remove yourself.
 - **Forgot a password?** Anyone can change their own on the account page. If someone is locked out, run `recruitly reset-password their@email.edu` on the machine running Recruitly. Changing a password signs that person out everywhere else.
 
 ## Interviews
@@ -93,6 +101,14 @@ recruitly import responses.csv
 3. Interviewers click **My interviews (.ics)** and open the file to add their slots to their calendar. If the schedule changes, download it again to pick up the new times.
 
 Times are in the org's time zone (`RECRUITLY_TIMEZONE`, Central time by default). Past slots are hidden unless you click *Show past*.
+
+## Scoring
+
+1. An admin opens **Rubric**, adds the criteria and weights, and renames or adds rounds to match how you interview. Naming rounds like your slot labels (e.g. "First round") lets the score page pick the right round automatically.
+2. After an interview, open the applicant and click **Score** next to the round. Pick 1-5 for each criterion, write notes, and **Submit scores** (or **Save draft** to finish later).
+3. Once you've submitted, everyone else's scores and notes for that round appear on the profile. Sort the board by **Score** to see who's on top.
+
+Changing a weight re-calculates every average. Removing a criterion deletes its scores, and a round with score sheets can be renamed but not deleted.
 
 ## Configuration
 
@@ -116,18 +132,20 @@ Set these as environment variables:
 - **SQLAlchemy 2.0** with SQLite by default
 - **Pillow** for headshot processing
 - **argon2-cffi** for password hashing and Starlette's signed session cookies for logins
-- Cleaning and account rules live in `recruitly/services/` as pure functions, so every rule is unit tested. A test checks that every route has an access rule, so a new page can't ship unprotected.
+- Cleaning, account, scheduling and scoring rules live in `recruitly/services/` as pure functions, so every rule is unit tested. A test checks that every route has an access rule, so a new page can't ship unprotected.
 
 ```
 recruitly/
   app.py              applicant, import and headshot routes
   accounts.py         setup, login, invites, members, your account
   schedule.py         interview slots, booking, .ics export
+  scoring.py          rubric, rounds and score sheet pages
   web.py              templates, current user, admin check, CSRF
-  models.py           Applicant, ImportPreview, User, Invite, InterviewSlot
+  models.py           Applicant, ImportPreview, User, Invite, InterviewSlot, Round, Criterion, ScoreSheet, Score
   services/
     auth.py           password hashing, roles, invite and login rules
     scheduling.py     slot parsing, double-booking checks, .ics building
+    scoring.py        rubric parsing, weighted averages, who-sees-whose-scores rules
     cleaning.py       header mapping + field validation/cleanup
     importer.py       two-step import: preview, then apply
     headshots.py      Drive download, zip matching, crop/resize
@@ -141,11 +159,11 @@ Run the tests with `pip install -e ".[dev]" && pytest`.
 
 ## Roadmap
 
-Scoring rubrics, voting, live Sheets sync and Docker are planned. See [ROADMAP.md](ROADMAP.md).
+A decisions dashboard with voting, live Sheets sync and Docker are planned. See [ROADMAP.md](ROADMAP.md).
 
 ## Privacy note
 
-Applicant data stays wherever you run Recruitly. Every page needs a login, and only admins can change or export data. The default only listens on localhost; if you put it on a server for your team, run it behind HTTPS and set `RECRUITLY_SECURE_COOKIES=1`.
+Applicant data stays wherever you run Recruitly. Every page needs a login, and only admins can change or export data. Score sheets are only shown to the team, under the anchoring rule above. The default only listens on localhost; if you put it on a server for your team, run it behind HTTPS and set `RECRUITLY_SECURE_COOKIES=1`.
 
 ## License
 

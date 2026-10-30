@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Table, Text
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Table, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -196,3 +196,64 @@ class InterviewSlot(Base):
     @property
     def interviewer_ids(self) -> set[int]:
         return {u.id for u in self.interviewers}
+
+
+class Round(Base):
+    """A stage of interviews that gets its own score sheets, e.g. "First round"."""
+
+    __tablename__ = "rounds"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(40), unique=True)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Criterion(Base):
+    """One line of the scoring rubric, scored 1-5 and weighted."""
+
+    __tablename__ = "rubric_criteria"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(60))
+    description: Mapped[str | None] = mapped_column(String(300))
+    weight: Mapped[float] = mapped_column(Float, default=1.0)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class ScoreSheet(Base):
+    """One member's scores and notes for one applicant in one round. A draft until submitted."""
+
+    __tablename__ = "score_sheets"
+    __table_args__ = (UniqueConstraint("applicant_id", "user_id", "round_id", name="uq_sheet_per_round"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    applicant_id: Mapped[int] = mapped_column(ForeignKey("applicants.id", ondelete="CASCADE"), index=True)
+    # kept (as "Former member") when the scorer's account is removed
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    round_id: Mapped[int] = mapped_column(ForeignKey("rounds.id", ondelete="CASCADE"), index=True)
+    notes: Mapped[str | None] = mapped_column(Text)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    user: Mapped[User | None] = relationship(lazy="joined")
+    scores: Mapped[list["Score"]] = relationship(back_populates="sheet", cascade="all, delete-orphan",
+                                                 lazy="selectin")
+
+    @property
+    def submitted(self) -> bool:
+        return self.submitted_at is not None
+
+    @property
+    def score_map(self) -> dict[int, int]:
+        return {s.criterion_id: s.value for s in self.scores}
+
+
+class Score(Base):
+    __tablename__ = "scores"
+
+    sheet_id: Mapped[int] = mapped_column(ForeignKey("score_sheets.id", ondelete="CASCADE"), primary_key=True)
+    criterion_id: Mapped[int] = mapped_column(ForeignKey("rubric_criteria.id", ondelete="CASCADE"), primary_key=True)
+    value: Mapped[int] = mapped_column(Integer)
+
+    sheet: Mapped[ScoreSheet] = relationship(back_populates="scores")

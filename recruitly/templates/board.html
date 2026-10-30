@@ -38,7 +38,7 @@
     {% for y in years %}<option {{ 'selected' if f.year == y }}>{{ y }}</option>{% endfor %}
   </select>
   <select name="sort" aria-label="Sort" onchange="this.form.submit()">
-    {% for k, label in [('name','Name'),('newest','Newest'),('gpa','GPA'),('status','Status')] %}
+    {% for k, label in [('name','Name'),('newest','Newest'),('score','Score'),('gpa','GPA'),('status','Status')] %}
       <option value="{{ k }}" {{ 'selected' if f.sort == k }}>Sort: {{ label }}</option>
     {% endfor %}
   </select>
@@ -57,7 +57,10 @@
       <div class="meta">{{ ap.classification or '' }}{% if ap.classification and ap.grad_term %} · {% endif %}{{ ap.grad_term or '' }}</div>
       {% set iv = next_interview.get(ap.id) %}
       {% if iv %}<div class="meta ivline">Interview {{ iv.starts_at|slotday }}, {{ clock(iv.starts_at) }}</div>{% endif %}
-      <div class="foot">{{ status_pill(ap.status) }}{% if ap.gpa %}<span class="meta">{{ '%.2f'|format(ap.gpa) }}</span>{% endif %}</div>
+      <div class="foot">{{ status_pill(ap.status) }}
+        <span class="footr">{% if ap.gpa %}<span class="meta">{{ '%.2f'|format(ap.gpa) }}</span>{% endif %}
+        {% set avg = scores.get(ap.id) %}{% if avg is not none %}<b class="avg {{ score_band(avg) }}" title="Average score">{{ fmt_score(avg) }}</b>{% endif %}</span></div>
+      {% if ap.id in scored %}<div class="meta youscored">You scored</div>{% endif %}
     </div>
   </a>
   {% endfor %}

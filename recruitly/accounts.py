@@ -16,6 +16,7 @@ from .services.auth import (
     removal_error, role_change_error, safe_next, validate_account, verify_password, MIN_PASSWORD_LEN,
 )
 from .schedule import forget_interviewer
+from .scoring import forget_scorer
 from .web import current_user, log_in, redirect, require_admin, session_version, templates
 
 throttle = LoginThrottle()
@@ -204,6 +205,7 @@ def register_account_routes(app: FastAPI) -> None:
             return redirect("/members", error=err)
         name = user.name
         forget_interviewer(session, user.id)
+        forget_scorer(session, user.id)
         session.delete(user)
         session.commit()
         return redirect("/members", msg=f"Removed {name}. They can't log in anymore.")

@@ -10,9 +10,9 @@ Recruitly ships in small, working releases. Each milestone below is one release:
 
 - [x] **v0.3: Interview scheduling.** Admins create interview slots (date, time, length, location or Zoom link, interviewers). Assign applicants to slots from the profile page or a schedule view; prevent double booking of applicants and interviewers. Schedule page grouped by day. Export a slot list as `.ics` so interviewers can add it to their calendars. Status moves to "Interviewing" automatically when someone is scheduled.
 
-## Next
+- [x] **v0.4: Notes and scoring rubric.** Admins define a rubric (criteria with 1-5 scales and weights). Members leave a score sheet and written notes per applicant per round. A profile shows each member's scores, the weighted average, and notes. Members can't see others' scores until they submit their own, to avoid anchoring. Board can sort by average score.
 
-- [ ] **v0.4: Notes and scoring rubric.** Admins define a rubric (criteria with 1-5 scales and weights). Members leave a score sheet and written notes per applicant per round. A profile shows each member's scores, the weighted average, and notes. Members can't see others' scores until they submit their own, to avoid anchoring. Board can sort by average score.
+## Next
 
 - [ ] **v0.5: Decisions dashboard and voting.** A decision view that ranks applicants by score, with columns for status, number of scorers and flags. Members vote yes/no/abstain per applicant during a deliberation session that the admin opens and closes. Results page with vote counts. Bulk status changes (select several → set Offered / Cut). Simple charts of the funnel (applied → interviewed → offered → accepted), rendered with inline SVG, no JS framework.
 

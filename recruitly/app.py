@@ -18,13 +18,17 @@ from starlette.middleware.sessions import SessionMiddleware
 from . import __version__
 from .accounts import register_account_routes
 from .config import settings
-from .db import get_session, init_db
+from .db import get_session, init_db, session_scope
 from .models import LONG_TEXT_FIELDS, PROFILE_FIELDS, Applicant, Status
 from .schedule import (
     applicant_interviews, forget_applicant, next_interviews, now_local, open_upcoming_slots, register_schedule_routes,
 )
+from .scoring import (
+    board_averages, ensure_rounds, forget_applicant_scores, profile_scores, register_scoring_routes, scored_by,
+)
 from .services.cleaning import HEADER_KEYWORDS, MAJORS, clean_row
 from .services.headshots import HeadshotError, delete_headshot, match_zip, save_headshot
+from .services.scoring import sort_by_score
 from .services.importer import (
     PROFILE_KEYS, ImportError_, apply_preview, build_preview, fetch_sheet, load_preview, read_csv, save_preview,
 )
@@ -40,6 +44,8 @@ FIELD_LABELS = dict(PROFILE_FIELDS) | {
 
 def create_app() -> FastAPI:
     init_db()
+    with session_scope() as s:
+        ensure_rounds(s)
     app = FastAPI(title="Recruitly", version=__version__, dependencies=[Depends(csrf_protect)],
                   docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(SessionMiddleware, secret_key=settings.secret_key, session_cookie="recruitly_session",
@@ -60,6 +66,7 @@ def create_app() -> FastAPI:
 
     register_account_routes(app)
     register_schedule_routes(app)
+    register_scoring_routes(app)
     register_routes(app)
     return app
 
@@ -74,9 +81,9 @@ def get_applicant(session: Session, applicant_id: int) -> Applicant:
 def register_routes(app: FastAPI) -> None:
     # ------------------------------------------------------------ board
 
-    @app.get("/", response_class=HTMLResponse, dependencies=[Depends(current_user)])
+    @app.get("/", response_class=HTMLResponse)
     def board(request: Request, q: str = "", status: str = "", major: str = "", year: str = "",
-              sort: str = "name", msg: str = "", session: Session = Depends(get_session)):
+              sort: str = "name", msg: str = "", me=Depends(current_user), session: Session = Depends(get_session)):
         stmt = select(Applicant)
         if q:
             like = f"%{q.strip()}%"
@@ -98,6 +105,10 @@ def register_routes(app: FastAPI) -> None:
             "status": [Applicant.status, Applicant.last_name],
         }.get(sort, [Applicant.last_name])
         applicants = session.scalars(stmt.order_by(*order)).all()
+        scores = board_averages(session, me)
+        if sort == "score":
+            by_id = {a.id: a for a in applicants}
+            applicants = [by_id[i] for i in sort_by_score([a.id for a in applicants], scores)]
 
         counts = dict(session.execute(select(Applicant.status, func.count()).group_by(Applicant.status)).all())
         total = sum(counts.values())
@@ -107,7 +118,7 @@ def register_routes(app: FastAPI) -> None:
         return templates.TemplateResponse(request, "board.html", {
             "applicants": applicants, "counts": counts, "total": total, "majors": majors, "years": years,
             "f": {"q": q, "status": status, "major": major, "year": year, "sort": sort}, "msg": msg,
-            "next_interview": next_interviews(session),
+            "next_interview": next_interviews(session), "scores": scores, "scored": scored_by(session, me.id),
         })
 
     @app.get("/headshots/{name}", dependencies=[Depends(current_user)])
@@ -142,6 +153,7 @@ def register_routes(app: FastAPI) -> None:
             "ap": ap, "fields": PROFILE_FIELDS, "long_fields": LONG_TEXT_FIELDS, "msg": msg, "error": error, "nav": nav,
             "interviews": applicant_interviews(session, ap.id), "now": now_local(),
             "open_slots": open_upcoming_slots(session) if request.state.user.is_admin else [],
+            "sc": profile_scores(session, ap, request.state.user),
         })
 
     @app.get("/applicants/{applicant_id}/edit", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
@@ -197,6 +209,7 @@ def register_routes(app: FastAPI) -> None:
         if ap.headshot_path:
             delete_headshot(ap.headshot_path)
         forget_applicant(session, ap.id)
+        forget_applicant_scores(session, ap.id)
         session.delete(ap)
         session.commit()
         return redirect("/", msg=f"Deleted {name}")

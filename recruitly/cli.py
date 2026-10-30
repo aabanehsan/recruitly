@@ -85,7 +85,7 @@ def load_demo_schedule() -> None:
     from sqlalchemy import select
 
     from .db import init_db, session_scope
-    from .demo import DEMO_BOOKINGS, DEMO_SLOTS
+    from .demo import DEMO_ADVANCED, DEMO_BOOKINGS, DEMO_SLOTS
     from .models import Applicant, InterviewSlot, User
     from .services.scheduling import local_now, parse_slot_input, status_after_booking
 
@@ -111,8 +111,47 @@ def load_demo_schedule() -> None:
                 ap.status = status_after_booking(ap.status)
                 booked += 1
         s.commit()
+        for email in DEMO_ADVANCED:
+            ap = s.scalars(select(Applicant).where(Applicant.email == email)).first()
+            if ap is not None:
+                ap.status = "final_round"
+        s.commit()
         total = sum(len(g) for g in groups)
-        print(f"  Added demo schedule: {total} interview slots over the next 2 days, {booked} applicants booked.")
+        print(f"  Added demo schedule: {total} interview slots (yesterday through the next 2 days), "
+              f"{booked} bookings.")
+
+
+def load_demo_scores() -> None:
+    """Set up the demo rubric and a handful of score sheets from yesterday's first round."""
+    from sqlalchemy import select
+
+    from .db import init_db, session_scope
+    from .demo import DEMO_RUBRIC, DEMO_SHEETS
+    from .models import Applicant, Criterion, Round, Score, ScoreSheet, User, utcnow
+    from .scoring import ensure_rounds
+
+    init_db()
+    with session_scope() as s:
+        if s.scalars(select(Criterion.id).limit(1)).first() is not None:
+            return
+        ensure_rounds(s)
+        crits = [Criterion(name=n, description=d, weight=w, position=i) for i, (n, d, w) in enumerate(DEMO_RUBRIC)]
+        s.add_all(crits)
+        s.flush()
+        rounds = {r.name: r for r in s.scalars(select(Round))}
+        users = {u.email: u for u in s.scalars(select(User))}
+        added = 0
+        for email, round_name, scorer, values, notes, submitted in DEMO_SHEETS:
+            ap = s.scalars(select(Applicant).where(Applicant.email == email)).first()
+            if ap is None or round_name not in rounds or scorer not in users:
+                continue
+            sheet = ScoreSheet(applicant_id=ap.id, user_id=users[scorer].id, round_id=rounds[round_name].id,
+                               notes=notes, submitted_at=utcnow() if submitted else None,
+                               scores=[Score(criterion_id=c.id, value=v) for c, v in zip(crits, values) if v])
+            s.add(sheet)
+            added += 1
+        s.commit()
+        print(f"  Added demo rubric: {len(crits)} criteria and {added} score sheets.")
 
 
 def print_demo_accounts(accounts) -> None:
@@ -212,6 +251,7 @@ def main(argv: list[str] | None = None) -> int:
         accounts = create_demo_accounts()
         if accounts:
             load_demo_schedule()
+            load_demo_scores()
         print_demo_accounts(accounts)
         settings.demo = bool(accounts)
     serve(args.host, args.port, not args.no_browser)
