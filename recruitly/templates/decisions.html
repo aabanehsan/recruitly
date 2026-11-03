@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% from "_macros.html" import photo, status_pill %}
+{% from "_votes.html" import vote_buttons, tally_bar, tally_counts, flag_list, bulk_bar with context %}
+{% block title %}Decisions{% endblock %}
+{% block content %}
+{% set here = '/decisions?' ~ ({'status': f.status, 'sort': f.sort}|urlencode) %}
+<div class="headrow">
+  <div>
+    <h1>Decisions</h1>
+    <p class="sub" style="margin:0">{{ total }} applicant{{ '' if total == 1 else 's' }} ranked by average score{% if not me.is_admin %} · you only see averages for applicants you've scored{% endif %}</p>
+  </div>
+  {% if live %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btn" href="/decisions/sessions/{{ live.id }}">{{ 'Live results' if me.is_admin else 'My votes' }}</a>
+  </div>
+  {% endif %}
+</div>
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+
+<div class="dgrid">
+  <section class="panel dpanel{{ ' live' if live }}">
+    <h2>Deliberation</h2>
+    {% if live %}
+      <p class="dlive"><span class="pill offered">Voting open</span> <b>{{ live.name }}</b></p>
+      <p class="sample" style="margin:0">Opened {{ live.opened_at|ago }} · {{ live_voters }} {{ 'person has' if live_voters == 1 else 'people have' }} voted · you've voted on {{ my_votes }}</p>
+      {% if me.is_admin %}
+      <p class="sample" style="margin:8px 0 0">You see the live tally. Members only see their own votes until you close the session.</p>
+      <form method="post" action="/decisions/sessions/{{ live.id }}/close" class="actions" style="margin-top:12px"
+            onsubmit='return confirm({{ ("Close " ~ live.name ~ "? Votes lock and everyone sees the results.")|tojson }})'>{{ csrf_field }}
+        <button class="btn primary" type="submit">Close and show results</button>
+        <a class="btn" href="/decisions/sessions/{{ live.id }}">Live results</a>
+      </form>
+      {% else %}
+      <p class="sample" style="margin:8px 0 0">Vote yes, no or abstain on each applicant below. Nobody sees the counts until an admin closes the session.</p>
+      {% endif %}
+    {% else %}
+      {% if me.is_admin %}
+      <form method="post" action="/decisions/sessions">{{ csrf_field }}
+        <label for="dname">Open a voting session</label>
+        <div class="row">
+          <input id="dname" name="name" placeholder="e.g. First-round debrief" maxlength="60">
+          <button class="btn primary" type="submit">Open voting</button>
+        </div>
+        <p class="hint">Everyone votes yes / no / abstain per applicant. Counts stay hidden from members until you close it.</p>
+      </form>
+      {% else %}
+      <p class="sample" style="margin:0">No vote is open right now. When an admin opens a deliberation, you'll vote on this page.</p>
+      {% endif %}
+    {% endif %}
+    {% if past %}
+    <h3 class="minih">Past sessions</h3>
+    <ul class="pastlist">
+      {% for d, nv, nvoters in past[:5] %}
+      <li><a href="/decisions/sessions/{{ d.id }}">{{ d.name }}</a><span class="sample">{{ d.closed_at|shortdate }} · {{ nv }} vote{{ '' if nv == 1 else 's' }} · {{ nvoters }} voter{{ '' if nvoters == 1 else 's' }}</span></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h2>Funnel</h2>
+    {% if total %}
+    <div class="funnel">
+      {% for st in funnel %}
+      <div class="fstage">
+        <div class="fhead"><b>{{ st.label }}</b><span><b>{{ st.count }}</b>{% if not loop.first %} <span class="sample">· {{ st.conversion }}% of {{ funnel[loop.index0 - 1].label|lower }}</span>{% endif %}</span></div>
+        <svg class="fbar" viewBox="0 0 100 14" preserveAspectRatio="none" role="img" aria-label="{{ st.label }}: {{ st.count }} ({{ st.share }}% of applicants)">
+          <rect class="bg" x="0" y="0" width="100" height="14"></rect>
+          {% if st.w %}<rect class="s{{ loop.index0 }}" x="{{ st.x }}" y="0" width="{{ st.w }}" height="14"></rect>{% endif %}
+        </svg>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="hint">Interviewed counts anyone whose interview has started, or who's further along. Offered includes accepted and declined offers.</p>
+    {% else %}<p class="sample">No applicants yet.</p>{% endif %}
+  </section>
+
+  <section class="panel">
+    <h2>Status mix</h2>
+    {% if total %}
+    <svg class="mixbar" viewBox="0 0 100 10" preserveAspectRatio="none" role="img"
+         aria-label="{% for sg in mix %}{{ sg.count }} {{ Status(sg.status).label }}{{ ', ' if not loop.last }}{% endfor %}">
+      {% for sg in mix %}<rect class="{{ sg.status }}" x="{{ sg.x }}" y="0" width="{{ sg.w }}" height="10"></rect>{% endfor %}
+    </svg>
+    <ul class="legend">
+      {% for sg in mix %}
+      <li><span class="sw {{ sg.status }}"></span>{{ Status(sg.status).label }}<b>{{ sg.count }}</b><span class="sample">{{ sg.pct }}%</span></li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="sample">No applicants yet.</p>{% endif %}
+  </section>
+</div>
+
+{% if total %}
+<div class="chips" style="margin-top:22px">
+  <a class="chip {{ 'on' if not f.status }}" href="/decisions?{{ {'sort': f.sort}|urlencode }}">All<b>{{ total }}</b></a>
+  {% for s in Status %}{% if counts.get(s.value) %}
+  <a class="chip {{ 'on' if f.status == s.value }}" href="/decisions?{{ {'status': s.value, 'sort': f.sort}|urlencode }}">{{ s.label }}<b>{{ counts[s.value] }}</b></a>
+  {% endif %}{% endfor %}
+  <form method="get" action="/decisions" class="sortpick">
+    <input type="hidden" name="status" value="{{ f.status }}">
+    <select name="sort" aria-label="Sort" onchange="this.form.submit()">
+      {% for k, label in sorts if k != 'votes' or show_tally %}<option value="{{ k }}" {{ 'selected' if f.sort == k }}>Sort: {{ label }}</option>{% endfor %}
+    </select>
+    <noscript><button class="btn small" type="submit">Sort</button></noscript>
+  </form>
+</div>
+
+{% if me.is_admin and rows %}{{ bulk_bar(bulk_statuses, here) }}{% endif %}
+
+{% if rows %}
+<div class="tablewrap">
+<table class="dtable">
+  <thead><tr>
+    {% if me.is_admin %}<th class="cb"><span class="sr">Select</span></th>{% endif %}
+    <th class="rk">#</th><th>Applicant</th><th>Status</th><th>Score</th><th>Scorers</th><th>Flags</th>
+    {% if live %}<th>{{ 'Your vote' }}{% if show_tally %} · tally{% endif %}</th>{% endif %}
+  </tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr id="ap-{{ r.ap.id }}">
+      {% if me.is_admin %}<td class="cb"><input type="checkbox" form="bulk" name="applicant_id" value="{{ r.ap.id }}" aria-label="Select {{ r.ap.display_name }}"></td>{% endif %}
+      <td class="rk">{{ r.rank or '–' }}</td>
+      <td class="app"><a class="person" href="/applicants/{{ r.ap.id }}">{{ photo(r.ap, small=True) }}
+        <span><b>{{ r.ap.display_name }}</b><br><span class="sample">{{ r.ap.major or 'Major not listed' }}{% if r.ap.classification %} · {{ r.ap.classification }}{% endif %}</span></span></a></td>
+      <td class="st">{{ status_pill(r.ap.status) }}</td>
+      <td class="sc">{% if r.average is not none %}<b class="avg {{ score_band(r.average) }}">{{ fmt_score(r.average) }}</b>{% else %}<span class="sample">—</span>{% endif %}</td>
+      <td class="nsc"><span class="sample">{{ r.stats.scorers }} scorer{{ '' if r.stats.scorers == 1 else 's' }}</span></td>
+      <td class="fl">{{ flag_list(r.flags) }}</td>
+      {% if live %}
+      <td class="vt">
+        {% if r.ap.status in CLOSED_STATUSES %}<span class="sample">Out of the running</span>
+        {% else %}{{ vote_buttons(live, r.ap.id, r.my_vote, here ~ '#ap-' ~ r.ap.id) }}{% endif %}
+        {% if show_tally and r.tally %}<div class="tline">{{ tally_bar(r.tally) }}{{ tally_counts(r.tally) }}</div>{% endif %}
+      </td>
+      {% endif %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="panel empty"><h2>No applicants with that status</h2><p><a href="/decisions">Show everyone</a></p></div>
+{% endif %}
+{% else %}
+<div class="panel empty" style="margin-top:22px"><h2>No applicants yet</h2><p>Once applicants are imported and scored, they're ranked here.</p></div>
+{% endif %}
+{% endblock %}

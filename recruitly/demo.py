@@ -1,10 +1,13 @@
 """Demo data `recruitly demo` creates: accounts (shown on the login page only in demo mode), interview slots,
-a scoring rubric and some score sheets."""
+a scoring rubric, some score sheets and two deliberations with votes."""
 
 DEMO_ACCOUNTS = [
     # (name, email, password, role)
     ("Alex Admin", "admin@demo.recruitly.dev", "demo-admin-2026", "admin"),
     ("Morgan Member", "member@demo.recruitly.dev", "demo-member-2026", "member"),
+    # two more members so the demo deliberations have a few voters
+    ("Riley Chen", "riley@demo.recruitly.dev", "demo-riley-2026", "member"),
+    ("Sam Okafor", "sam@demo.recruitly.dev", "demo-sam-2026", "member"),
 ]
 
 ZOOM = "https://utexas.zoom.us/j/5550101234"
@@ -63,4 +66,30 @@ DEMO_SHEETS = [
     ("aisha.khan@utexas.edu", "First round", M, (3, None, 4, None), "Half done, finish after the debrief.", False),
     ("mateo.garcia@gmail.com", "First round", A, (3, 4, 3, 3),
      "Transfer with real work experience at the logistics company. Seemed nervous; give him another look.", True),
+]
+
+R, S = "riley@demo.recruitly.dev", "sam@demo.recruitly.dev"
+# (name, opened how many hours ago, open for how many hours (None = still open),
+#  {applicant email: {voter: choice}}, statuses set after it closed)
+DEMO_DELIBERATIONS = [
+    ("Written app screening", 4 * 24 + 3, 2, {
+        "dnguyen@utexas.edu": {A: "yes", M: "yes", R: "yes", S: "yes"},
+        "priya.raman@utexas.edu": {A: "yes", M: "yes", R: "yes", S: "yes"},
+        "grace.kim@utexas.edu": {A: "yes", M: "yes", R: "yes", S: "abstain"},
+        "mateo.garcia@gmail.com": {A: "yes", M: "yes", R: "no", S: "yes"},
+        "aisha.khan@utexas.edu": {A: "yes", M: "abstain", R: "yes", S: "no"},
+        "kevin.patel@utexas.edu": {A: "no", M: "yes", R: "no", S: "no"},
+        "hannah.schultz@utexas.edu": {A: "no", M: "no", R: "yes", S: "abstain"},
+        "tyler.brooks@utexas.edu": {A: "no", M: "no", R: "no", S: "abstain"},
+        "noahwilliams@utexas.edu": {A: "no", M: "abstain", R: "no", S: "no"},
+    }, {"kevin.patel@utexas.edu": "cut", "hannah.schultz@utexas.edu": "cut", "tyler.brooks@utexas.edu": "cut",
+        "noahwilliams@utexas.edu": "cut"}),
+    # still open: Riley and Sam already voted, so log in as the admin to see the live tally,
+    # or as Morgan to vote without seeing it
+    ("First-round debrief", 2, None, {
+        "dnguyen@utexas.edu": {R: "yes", S: "yes"},
+        "grace.kim@utexas.edu": {R: "yes", S: "abstain"},
+        "aisha.khan@utexas.edu": {R: "no", S: "yes"},
+        "mateo.garcia@gmail.com": {R: "no", S: "no"},
+    }, {}),
 ]

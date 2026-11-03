@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "_macros.html" import photo, status_pill %}
+{% from "_votes.html" import vote_buttons, tally_bar, tally_counts, bulk_bar with context %}
+{% block title %}{{ d.name }}{% endblock %}
+{% block content %}
+{% set here = '/decisions/sessions/' ~ d.id %}
+<p class="sample" style="margin:0 0 6px"><a href="/decisions">← Decisions</a></p>
+<div class="headrow">
+  <div>
+    <h1>{{ d.name }}</h1>
+    <p class="sub" style="margin:0">
+      {% if d.is_open %}<span class="pill offered">Voting open</span> · opened {{ d.opened_at|ago }}
+      {% else %}<span class="pill duplicate">Closed</span> · {{ d.closed_at|longdate }} UTC{% endif %}
+      · {{ votes }} vote{{ '' if votes == 1 else 's' }} from {{ voters }} {{ 'person' if voters == 1 else 'people' }}
+    </p>
+  </div>
+  {% if me.is_admin %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    {% if d.is_open %}
+    <form method="post" action="/decisions/sessions/{{ d.id }}/close"
+          onsubmit='return confirm({{ ("Close " ~ d.name ~ "? Votes lock and everyone sees the results.")|tojson }})'>{{ csrf_field }}
+      <button class="btn primary" type="submit">Close and show results</button>
+    </form>
+    {% endif %}
+    <form method="post" action="/decisions/sessions/{{ d.id }}/delete"
+          onsubmit='return confirm({{ ("Delete " ~ d.name ~ " and all of its votes? This can’t be undone.")|tojson }})'>{{ csrf_field }}
+      <button class="btn danger" type="submit">Delete session</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+
+{% if not visible %}
+<div class="panel locked" style="margin-bottom:18px">Results stay hidden until an admin closes this session, so nobody votes with the room. Below are your own votes; change them on <a href="/decisions">Decisions</a>.</div>
+{% elif d.is_open %}
+<div class="flash">Live tally: only admins can see this while voting is open.</div>
+{% endif %}
+
+{% if visible and rows %}
+<div class="stats">
+  {% for k in ('yes', 'no', 'tied') %}
+  <div class="stat"><b>{{ summary[k] }}</b><span>{{ VERDICT_LABELS[k] }}</span></div>
+  {% endfor %}
+  <div class="stat"><b>{{ rows|length }}</b><span>Applicants voted on</span></div>
+</div>
+{% endif %}
+
+{% if me.is_admin and visible and rows %}{{ bulk_bar(bulk_statuses, here) }}{% endif %}
+
+{% if rows %}
+<div class="tablewrap">
+<table class="dtable rtable">
+  <thead><tr>
+    {% if me.is_admin and visible %}<th class="cb"><span class="sr">Select</span></th>{% endif %}
+    <th>Applicant</th><th>Status</th><th>Score</th>
+    {% if visible %}<th>Votes</th><th>Result</th>{% else %}<th>Your vote</th>{% endif %}
+  </tr></thead>
+  <tbody>
+  {% for ap, t, mine, avg in rows %}
+    <tr id="ap-{{ ap.id }}">
+      {% if me.is_admin and visible %}<td class="cb"><input type="checkbox" form="bulk" name="applicant_id" value="{{ ap.id }}" aria-label="Select {{ ap.display_name }}"></td>{% endif %}
+      <td class="app"><a class="person" href="/applicants/{{ ap.id }}">{{ photo(ap, small=True) }}
+        <span><b>{{ ap.display_name }}</b><br><span class="sample">{{ ap.major or 'Major not listed' }}</span></span></a></td>
+      <td class="st">{{ status_pill(ap.status) }}</td>
+      <td class="sc">{% if avg is not none %}<b class="avg {{ score_band(avg) }}">{{ fmt_score(avg) }}</b>{% else %}<span class="sample">—</span>{% endif %}</td>
+      {% if visible %}
+      <td class="vt"><div class="tline">{{ tally_bar(t) }}{{ tally_counts(t) }}</div>{% if mine %}<span class="sample">You voted {{ VOTE_LABELS[mine]|lower }}</span>{% endif %}</td>
+      <td class="res"><span class="verdict {{ t.verdict }}">{{ VERDICT_LABELS[t.verdict] }}</span>{% if t.yes_share is not none %} <span class="sample">{{ (t.yes_share * 100)|round|int }}% yes</span>{% endif %}</td>
+      {% else %}
+      <td class="vt"><span class="vb {{ mine }} on static">{{ VOTE_LABELS[mine] }}</span></td>
+      {% endif %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="panel empty"><h2>{% if not visible %}You haven't voted yet{% else %}No votes {{ 'yet' if d.is_open else 'in this session' }}{% endif %}</h2>
+  {% if d.is_open %}<p>Vote on applicants from the <a href="/decisions">Decisions</a> page or their profiles.</p>{% endif %}</div>
+{% endif %}
+{% endblock %}

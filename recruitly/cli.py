@@ -154,6 +154,44 @@ def load_demo_scores() -> None:
         print(f"  Added demo rubric: {len(crits)} criteria and {added} score sheets.")
 
 
+def load_demo_votes() -> None:
+    """Add a closed screening deliberation (with its cuts) and an open first-round debrief."""
+    from datetime import timedelta
+
+    from sqlalchemy import select
+
+    from .db import init_db, session_scope
+    from .demo import DEMO_DELIBERATIONS
+    from .models import Applicant, Deliberation, User, Vote, utcnow
+
+    init_db()
+    with session_scope() as s:
+        if s.scalars(select(Deliberation.id).limit(1)).first() is not None:
+            return
+        users = {u.email: u for u in s.scalars(select(User))}
+        aps = {a.email: a for a in s.scalars(select(Applicant))}
+        admin = next((u for u in users.values() if u.is_admin), None)
+        now = utcnow()
+        votes = 0
+        for name, hours_ago, hours_open, ballots, after in DEMO_DELIBERATIONS:
+            opened = now - timedelta(hours=hours_ago)
+            d = Deliberation(name=name, opened_at=opened, opened_by_id=admin.id if admin else None,
+                             closed_at=opened + timedelta(hours=hours_open) if hours_open is not None else None)
+            s.add(d)
+            s.flush()
+            for email, by in ballots.items():
+                for voter, choice in by.items():
+                    if email in aps and voter in users:
+                        s.add(Vote(deliberation_id=d.id, applicant_id=aps[email].id, user_id=users[voter].id,
+                                   choice=choice, created_at=opened, updated_at=opened))
+                        votes += 1
+            for email, status in after.items():
+                if email in aps:
+                    aps[email].status = status
+        s.commit()
+        print(f"  Added demo deliberations: {len(DEMO_DELIBERATIONS)} sessions (one still open), {votes} votes.")
+
+
 def print_demo_accounts(accounts) -> None:
     if not accounts:
         return
@@ -252,6 +290,7 @@ def main(argv: list[str] | None = None) -> int:
         if accounts:
             load_demo_schedule()
             load_demo_scores()
+            load_demo_votes()
         print_demo_accounts(accounts)
         settings.demo = bool(accounts)
     serve(args.host, args.port, not args.no_browser)

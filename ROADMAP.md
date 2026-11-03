@@ -12,9 +12,9 @@ Recruitly ships in small, working releases. Each milestone below is one release:
 
 - [x] **v0.4: Notes and scoring rubric.** Admins define a rubric (criteria with 1-5 scales and weights). Members leave a score sheet and written notes per applicant per round. A profile shows each member's scores, the weighted average, and notes. Members can't see others' scores until they submit their own, to avoid anchoring. Board can sort by average score.
 
-## Next
+- [x] **v0.5: Decisions dashboard and voting.** A decision view that ranks applicants by score, with columns for status, number of scorers and flags. Members vote yes/no/abstain per applicant during a deliberation session that the admin opens and closes. Results page with vote counts. Bulk status changes (select several → set Offered / Cut). Simple charts of the funnel (applied → interviewed → offered → accepted), rendered with inline SVG, no JS framework.
 
-- [ ] **v0.5: Decisions dashboard and voting.** A decision view that ranks applicants by score, with columns for status, number of scorers and flags. Members vote yes/no/abstain per applicant during a deliberation session that the admin opens and closes. Results page with vote counts. Bulk status changes (select several → set Offered / Cut). Simple charts of the funnel (applied → interviewed → offered → accepted), rendered with inline SVG, no JS framework.
+## Next
 
 - [ ] **v0.6: Live Google Sheets sync and email templates.** Save the Sheets link in settings and re-sync with one click: new responses are added and changed ones updated, using the existing preview flow. Show "last synced" time. Email templates for interview invites, offers and rejections with placeholders ({first_name}, {slot_time}); generate per-applicant drafts the admin can copy or open as `mailto:` links. No email is sent automatically.
 

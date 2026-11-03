@@ -257,3 +257,35 @@ class Score(Base):
     value: Mapped[int] = mapped_column(Integer)
 
     sheet: Mapped[ScoreSheet] = relationship(back_populates="scores")
+
+
+class Deliberation(Base):
+    """A voting session the admin opens and closes. At most one is open at a time."""
+
+    __tablename__ = "deliberations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(60))
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    opened_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+    @property
+    def is_open(self) -> bool:
+        return self.closed_at is None
+
+
+class Vote(Base):
+    """One member's yes / no / abstain on one applicant in one deliberation."""
+
+    __tablename__ = "votes"
+    __table_args__ = (UniqueConstraint("deliberation_id", "applicant_id", "user_id", name="uq_vote_per_member"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    deliberation_id: Mapped[int] = mapped_column(ForeignKey("deliberations.id", ondelete="CASCADE"), index=True)
+    applicant_id: Mapped[int] = mapped_column(ForeignKey("applicants.id", ondelete="CASCADE"), index=True)
+    # kept (and still counted) when the voter's account is removed
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    choice: Mapped[str] = mapped_column(String(10))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

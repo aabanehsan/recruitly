@@ -1,0 +1,44 @@
+{# Shared bits for the decisions pages: vote buttons, tally bars, flags and the bulk status bar.
+   Import with context (they use csrf_field). #}
+{% macro vote_buttons(d, ap_id, mine, next) -%}
+  <form method="post" action="/decisions/sessions/{{ d.id }}/vote" class="votebtns">{{ csrf_field }}
+    <input type="hidden" name="applicant_id" value="{{ ap_id }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    {% for c in VOTE_CHOICES %}
+    <button type="submit" name="choice" value="{{ c }}" class="vb {{ c }}{{ ' on' if mine == c }}"
+            aria-pressed="{{ 'true' if mine == c else 'false' }}"
+            title="{{ 'Your vote. Click again to take it back' if mine == c else 'Vote ' ~ VOTE_LABELS[c]|lower }}">{{ VOTE_LABELS[c] }}</button>
+    {% endfor %}
+  </form>
+{%- endmacro %}
+
+{% macro tally_bar(t) -%}
+  <svg class="tbar" viewBox="0 0 100 8" preserveAspectRatio="none" role="img"
+       aria-label="{{ t.yes }} yes, {{ t.no }} no, {{ t.abstain }} abstain">
+    <rect class="bg" x="0" y="0" width="100" height="8"></rect>
+    {% for c, x, w in t.bar() %}<rect class="{{ c }}" x="{{ x }}" y="0" width="{{ w }}" height="8"></rect>{% endfor %}
+  </svg>
+{%- endmacro %}
+
+{% macro tally_counts(t) -%}
+  <span class="tcounts"><b class="yes">{{ t.yes }}</b> yes · <b class="no">{{ t.no }}</b> no · <b>{{ t.abstain }}</b> abstain</span>
+{%- endmacro %}
+
+{% macro flag_list(flags) -%}
+  {% for fl in flags %}<span class="flag {{ fl.tone }}" title="{{ fl.hint }}">{{ fl.label }}</span>{% endfor %}
+{%- endmacro %}
+
+{% macro bulk_bar(statuses, next) -%}
+  <form method="post" action="/decisions/bulk-status" id="bulk" class="bulkbar">{{ csrf_field }}
+    <input type="hidden" name="next" value="{{ next }}">
+    <label class="check"><input type="checkbox" aria-label="Select all"
+      onclick="document.querySelectorAll('input[form=bulk][name=applicant_id]').forEach(function (c) { c.checked = this.checked }, this)">Select all</label>
+    <span class="grow"></span>
+    <label for="bulk_status" class="sr">Set status</label>
+    <select id="bulk_status" name="status" required>
+      <option value="">Set status…</option>
+      {% for s in statuses %}<option value="{{ s.value }}">{{ s.label }}</option>{% endfor %}
+    </select>
+    <button class="btn primary" type="submit">Apply to selected</button>
+  </form>
+{%- endmacro %}

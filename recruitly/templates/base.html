@@ -17,6 +17,7 @@
       <a href="/" class="{{ 'on' if path == '/' or path.startswith('/applicants/') and not path.endswith('/new') }}">Applicants</a>
       <a href="/schedule" class="{{ 'on' if path.startswith('/schedule') }}">Schedule</a>
       <a href="/rubric" class="{{ 'on' if path.startswith('/rubric') }}">Rubric</a>
+      <a href="/decisions" class="{{ 'on' if path.startswith('/decisions') }}">Decisions</a>
       {% if me.is_admin %}
       <a href="/import" class="{{ 'on' if path.startswith('/import') }}">Import</a>
       <a href="/headshots-bulk" class="{{ 'on' if path.startswith('/headshots-bulk') }}">Headshots</a>

@@ -8,7 +8,14 @@ Applicant tracking for student org recruitment. Point it at your Google Form res
 
 Most orgs run recruitment out of a Google Form and a messy spreadsheet. Names come in as `jOHN`, majors as `cs`, `comp sci` and `Computer Science`, phone numbers in five formats, and someone always submits twice. Headshots end up in a Drive folder that nobody can match to the right row. Recruitly fixes all of that on import and gives you a board you can actually run rush from.
 
-## Features (v0.4)
+## Features (v0.5)
+
+- **Decisions dashboard and voting.** The **Decisions** page ranks every applicant by average score, with their status, how many people scored them, and flags worth a second look: *Not scored* (interviewed but nobody submitted), *1 scorer*, *Split* (scorers more than 1.5 points apart) and *Draft pending*.
+  - **Deliberations:** an admin opens a voting session (say, "First-round debrief"), everyone votes **yes / no / abstain** per applicant from the Decisions page or the profile, and the admin closes it. Click your vote again to take it back. Cut and declined applicants can't be voted on.
+  - **No voting with the room:** while a session is open, members only see their own votes and how many people have voted. Admins see the live tally. When the session closes, everyone sees the counts on its **results page**, ranked by net support with *Majority yes / no / Tied*. Votes are only ever shown as counts, never per person.
+  - **Bulk status changes:** admins tick several applicants (on Decisions or a results page) and set them all to *Offered*, *Cut* or any other status at once.
+  - **Charts:** a recruitment funnel (applied → interviewed → offered → accepted, with the conversion at each step) and a status mix bar, drawn as inline SVG with no JavaScript library.
+  - The anchoring rule from scoring still holds: members only see averages and *Split* flags for applicants they've scored.
 
 - **Scoring rubric and notes.** Admins set up the rubric on the **Rubric** page: criteria like Communication or Fit, each scored 1 to 5, with a weight (a 2 counts twice as much as a 1) and an optional "what to look for" line. Rounds (First round, Final round, or your own) get separate score sheets.
   - Everyone on the team fills in a **score sheet** per applicant per round: a 1-5 score for each criterion plus written notes. Save a draft and finish it later, or submit it. Submitted sheets can still be edited.
@@ -56,14 +63,16 @@ cd recruitly
 python3 run.py demo
 ```
 
-That one command sets up everything the first time, loads 12 sample form responses (fictional people, deliberately messy data), creates two demo logins, adds interview slots (yesterday's first round plus two days starting tomorrow), a four-criterion rubric with score sheets from yesterday's interviews, and opens the app at http://localhost:8000:
+That one command sets up everything the first time, loads 15 sample form responses (fictional people, deliberately messy data), creates four demo logins, adds interview slots (yesterday's first round plus two days starting tomorrow), a four-criterion rubric with score sheets from yesterday's interviews, a closed screening vote (which cut four applicants) and an open first-round debrief, and opens the app at http://localhost:8000:
 
 | Role | Email | Password |
 |---|---|---|
 | Admin | `admin@demo.recruitly.dev` | `demo-admin-2026` |
 | Member | `member@demo.recruitly.dev` | `demo-member-2026` |
+| Member | `riley@demo.recruitly.dev` | `demo-riley-2026` |
+| Member | `sam@demo.recruitly.dev` | `demo-sam-2026` |
 
-They're printed in the terminal and shown on the login page too. Log in as the member to see the read-only view and the anchoring rule: Morgan can see everyone's scores for Danny and Grace (Morgan scored them) but not for Mateo, and Aisha still has an unfinished draft.
+They're printed in the terminal and shown on the login page too. Log in as the member to see the read-only view and the anchoring rule: Morgan can see everyone's scores for Danny and Grace (Morgan scored them) but not for Mateo, and Aisha still has an unfinished draft. On **Decisions**, Riley and Sam have already voted in the open debrief: the admin sees their tally, Morgan only sees a vote count until the admin closes it.
 
 Use `python3 run.py` without `demo` to start fresh: the first page asks you to create the admin account, then you invite the rest of your exec team from **Members**.
 
@@ -91,7 +100,7 @@ recruitly import responses.csv
 
 - **First run:** open the app and create the admin account. That page disappears once an account exists.
 - **Inviting:** Members → *Create invite link*, then send the link. Each link works once. If you fill in an email, only that address can sign up with it.
-- **Roles:** admins can import, edit, change statuses, upload headshots, schedule interviews, export and manage members. Members can view applicants and the interview schedule, download calendar files, and fill in their own score sheets. There's always at least one admin, and you can't demote or remove yourself.
+- **Roles:** admins can import, edit, change statuses (one at a time or in bulk), upload headshots, schedule interviews, run deliberations, export and manage members. Members can view applicants and the interview schedule, download calendar files, fill in their own score sheets and vote in open deliberations. There's always at least one admin, and you can't demote or remove yourself.
 - **Forgot a password?** Anyone can change their own on the account page. If someone is locked out, run `recruitly reset-password their@email.edu` on the machine running Recruitly. Changing a password signs that person out everywhere else.
 
 ## Interviews
@@ -109,6 +118,14 @@ Times are in the org's time zone (`RECRUITLY_TIMEZONE`, Central time by default)
 3. Once you've submitted, everyone else's scores and notes for that round appear on the profile. Sort the board by **Score** to see who's on top.
 
 Changing a weight re-calculates every average. Removing a criterion deletes its scores, and a round with score sheets can be renamed but not deleted.
+
+## Deliberations
+
+1. On **Decisions**, an admin types a name (e.g. "First-round debrief") and clicks **Open voting**. Only one session can be open at a time.
+2. Everyone votes yes, no or abstain on each applicant, from the table or the applicant's profile. Votes can change until the session closes.
+3. The admin clicks **Close and show results**. The results page ranks applicants by yes minus no votes; tick the ones you've decided on and use **Set status** to move them to *Offered* or *Cut* in one go.
+
+Past sessions stay listed on the Decisions page and on each applicant's profile. Deleting a session deletes its votes.
 
 ## Configuration
 
@@ -132,7 +149,7 @@ Set these as environment variables:
 - **SQLAlchemy 2.0** with SQLite by default
 - **Pillow** for headshot processing
 - **argon2-cffi** for password hashing and Starlette's signed session cookies for logins
-- Cleaning, account, scheduling and scoring rules live in `recruitly/services/` as pure functions, so every rule is unit tested. A test checks that every route has an access rule, so a new page can't ship unprotected.
+- Cleaning, account, scheduling, scoring and decision rules live in `recruitly/services/` as pure functions, so every rule is unit tested. A test checks that every route has an access rule, so a new page can't ship unprotected.
 
 ```
 recruitly/
@@ -140,12 +157,15 @@ recruitly/
   accounts.py         setup, login, invites, members, your account
   schedule.py         interview slots, booking, .ics export
   scoring.py          rubric, rounds and score sheet pages
+  decisions.py        decisions dashboard, deliberations, votes, bulk status
   web.py              templates, current user, admin check, CSRF
-  models.py           Applicant, ImportPreview, User, Invite, InterviewSlot, Round, Criterion, ScoreSheet, Score
+  models.py           Applicant, ImportPreview, User, Invite, InterviewSlot, Round, Criterion, ScoreSheet, Score,
+                      Deliberation, Vote
   services/
     auth.py           password hashing, roles, invite and login rules
     scheduling.py     slot parsing, double-booking checks, .ics building
     scoring.py        rubric parsing, weighted averages, who-sees-whose-scores rules
+    decisions.py      ranking, flags, vote tallies and visibility, funnel and chart maths
     cleaning.py       header mapping + field validation/cleanup
     importer.py       two-step import: preview, then apply
     headshots.py      Drive download, zip matching, crop/resize
@@ -159,7 +179,7 @@ Run the tests with `pip install -e ".[dev]" && pytest`.
 
 ## Roadmap
 
-A decisions dashboard with voting, live Sheets sync and Docker are planned. See [ROADMAP.md](ROADMAP.md).
+Live Google Sheets sync with email templates, then Docker and Postgres support, are planned. See [ROADMAP.md](ROADMAP.md).
 
 ## Privacy note
 

@@ -67,6 +67,18 @@ PEOPLE = [
      "I'm excited about the case competitions.", "I've lived in four countries.", "Tue evenings"),
     ("Noah", "Williams", "", "noah williams@utexas.edu", "nw10001", "123", "Kinesology", "", "", "Senior", "May 2026",
      "4.6", "Waco, TX", "", "", "", "Club basketball", "To meet new people.", "I'm 6'8\".", "Weekends"),
+    # cut after the written-application screening vote in the demo
+    ("Tyler", "brooks", "", "tyler.brooks@utexas.edu", "tb30417", "512-555-0175", "marketing", "", "", "Junior",
+     "May 2027", "3.1", "Round Rock, TX", "", "", "@tbrooks", "Intramural flag football",
+     "My roommate is a member and says it's fun.", "I've never seen Star Wars.", "Fridays"),
+    ("Hannah", "Schultz", "", "Hannah.Schultz@utexas.edu", "hs66120", "281.555.0144", "Psych", "",
+     "Business Foundations", "2nd year", "Spring 2028", "3.55", "Katy, TX", "linkedin.com/in/hannahschultz", "", "",
+     "Psychology Student Association, barista at a campus coffee shop", "I want to explore consulting.",
+     "I can juggle.", "Wednesday evenings"),
+    ("Kevin", "patel", "", "kevin.patel@utexas.edu", "kp88213", "(512) 555-0196", "Finance", "Economics", "",
+     "senior", "Dec 2026", "3.79", "Austin, TX", "linkedin.com/in/kevinpatel", "", "",
+     "Investment club, internship at a regional bank", "I want to give back to younger students.",
+     "I've been skydiving.", "Weekday afternoons"),
 ]
 
 

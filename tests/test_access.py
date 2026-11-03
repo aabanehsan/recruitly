@@ -18,6 +18,8 @@ ANY_MEMBER = {
     ("GET", "/schedule"), ("GET", "/schedule.ics"),
     ("GET", "/rubric"), ("GET", "/applicants/{applicant_id}/score"), ("POST", "/applicants/{applicant_id}/score"),
     ("POST", "/applicants/{applicant_id}/score/delete"),
+    ("GET", "/decisions"), ("GET", "/decisions/sessions/{deliberation_id}"),
+    ("POST", "/decisions/sessions/{deliberation_id}/vote"),
 }
 ADMIN_ONLY = {
     ("GET", "/applicants/new"), ("POST", "/applicants/new"),
@@ -35,6 +37,8 @@ ADMIN_ONLY = {
     ("POST", "/rubric/criteria"), ("POST", "/rubric/criteria/{criterion_id}/edit"),
     ("POST", "/rubric/criteria/{criterion_id}/move"), ("POST", "/rubric/criteria/{criterion_id}/delete"),
     ("POST", "/rubric/rounds"), ("POST", "/rubric/rounds/{round_id}/edit"), ("POST", "/rubric/rounds/{round_id}/delete"),
+    ("POST", "/decisions/sessions"), ("POST", "/decisions/sessions/{deliberation_id}/close"),
+    ("POST", "/decisions/sessions/{deliberation_id}/delete"), ("POST", "/decisions/bulk-status"),
 }
 
 
@@ -61,7 +65,7 @@ def test_every_route_has_an_access_rule(app):
 
 
 def test_anonymous_is_sent_to_login_everywhere(app, client, anon):
-    ids = {"applicant_id": add_applicant(client), "token": "x", "user_id": 1, "name": "x.jpg", "slot_id": 1, "criterion_id": 1, "round_id": 1}
+    ids = {"applicant_id": add_applicant(client), "token": "x", "user_id": 1, "name": "x.jpg", "slot_id": 1, "criterion_id": 1, "round_id": 1, "deliberation_id": 1}
     anon.headers["X-CSRF-Token"] = csrf_of(anon)
     for method, path in sorted(ANY_MEMBER | ADMIN_ONLY):
         r = anon.request(method, fill(path, ids), follow_redirects=False)
@@ -72,7 +76,7 @@ def test_anonymous_is_sent_to_login_everywhere(app, client, anon):
 
 
 def test_members_can_view_but_not_change(app, client, member):
-    ids = {"applicant_id": add_applicant(client), "token": "x", "user_id": 1, "name": "x.jpg", "slot_id": 1, "criterion_id": 1, "round_id": 1}
+    ids = {"applicant_id": add_applicant(client), "token": "x", "user_id": 1, "name": "x.jpg", "slot_id": 1, "criterion_id": 1, "round_id": 1, "deliberation_id": 1}
     for method, path in sorted(ADMIN_ONLY):
         r = member.request(method, fill(path, ids), follow_redirects=False)
         assert r.status_code == 403, (method, path, r.status_code)
@@ -89,7 +93,7 @@ def test_members_can_view_but_not_change(app, client, member):
 
 
 def test_admin_reaches_every_admin_route(app, client):
-    ids = {"applicant_id": add_applicant(client), "token": "x", "user_id": 999, "name": "x.jpg", "slot_id": 999, "criterion_id": 999, "round_id": 999}
+    ids = {"applicant_id": add_applicant(client), "token": "x", "user_id": 999, "name": "x.jpg", "slot_id": 999, "criterion_id": 999, "round_id": 999, "deliberation_id": 999}
     for method, path in sorted(ADMIN_ONLY):
         r = client.request(method, fill(path, ids), follow_redirects=False)
         assert r.status_code != 403 and not is_login_redirect(r), (method, path, r.status_code)

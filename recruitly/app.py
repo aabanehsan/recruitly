@@ -19,6 +19,7 @@ from . import __version__
 from .accounts import register_account_routes
 from .config import settings
 from .db import get_session, init_db, session_scope
+from .decisions import forget_applicant_votes, profile_votes, register_decision_routes
 from .models import LONG_TEXT_FIELDS, PROFILE_FIELDS, Applicant, Status
 from .schedule import (
     applicant_interviews, forget_applicant, next_interviews, now_local, open_upcoming_slots, register_schedule_routes,
@@ -67,6 +68,7 @@ def create_app() -> FastAPI:
     register_account_routes(app)
     register_schedule_routes(app)
     register_scoring_routes(app)
+    register_decision_routes(app)
     register_routes(app)
     return app
 
@@ -154,6 +156,7 @@ def register_routes(app: FastAPI) -> None:
             "interviews": applicant_interviews(session, ap.id), "now": now_local(),
             "open_slots": open_upcoming_slots(session) if request.state.user.is_admin else [],
             "sc": profile_scores(session, ap, request.state.user),
+            "votes": profile_votes(session, ap, request.state.user),
         })
 
     @app.get("/applicants/{applicant_id}/edit", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
@@ -210,6 +213,7 @@ def register_routes(app: FastAPI) -> None:
             delete_headshot(ap.headshot_path)
         forget_applicant(session, ap.id)
         forget_applicant_scores(session, ap.id)
+        forget_applicant_votes(session, ap.id)
         session.delete(ap)
         session.commit()
         return redirect("/", msg=f"Deleted {name}")

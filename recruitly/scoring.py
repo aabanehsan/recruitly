@@ -47,8 +47,8 @@ def view_of(sheet: ScoreSheet, w: dict[int, float]) -> SheetView:
                      weighted_score(sheet.score_map, w))
 
 
-def board_averages(session: Session, me: User) -> dict[int, float]:
-    """Average score per applicant, as far as `me` is allowed to see (for the board)."""
+def sheet_views(session: Session) -> list[SheetView]:
+    """Every score sheet as a SheetView (with its weighted total), in two queries."""
     w = weights(criteria(session))
     rows = session.execute(
         select(ScoreSheet.id, ScoreSheet.applicant_id, ScoreSheet.round_id, ScoreSheet.user_id,
@@ -60,8 +60,12 @@ def board_averages(session: Session, me: User) -> dict[int, float]:
         head, sc = sheets.setdefault(sid, ((sid, ap, rd, uid, sub is not None), {}))
         if cid is not None:
             sc[cid] = val
-    views = [SheetView(*head, weighted_score(sc, w)) for head, sc in sheets.values()]
-    return visible_averages(views, me.id, me.is_admin)
+    return [SheetView(*head, weighted_score(sc, w)) for head, sc in sheets.values()]
+
+
+def board_averages(session: Session, me: User) -> dict[int, float]:
+    """Average score per applicant, as far as `me` is allowed to see (for the board)."""
+    return visible_averages(sheet_views(session), me.id, me.is_admin)
 
 
 def scored_by(session: Session, user_id: int) -> set[int]:

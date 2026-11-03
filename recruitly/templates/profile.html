@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_macros.html" import photo, status_pill, issue_list %}
+{% from "_votes.html" import vote_buttons, tally_bar, tally_counts with context %}
 {% block title %}{{ ap.display_name }}{% endblock %}
 {% block content %}
 {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
@@ -83,6 +84,28 @@
         {% endif %}
       {% endif %}
     </div>
+
+    {% if votes.live or votes.past %}
+    <div class="panel ivpanel">
+      <h2>Votes</h2>
+      {% if votes.live %}
+      <div class="ivrow">
+        <b>{{ votes.live.name }} <span class="pill offered">Open</span></b>
+        {% if votes.votable %}{{ vote_buttons(votes.live, ap.id, votes.mine, '/applicants/' ~ ap.id) }}
+        {% else %}<span class="sample">{{ ap.status_enum.label }}, so out of the running.</span>{% endif %}
+        {% if votes.tally %}<div class="tline">{{ tally_bar(votes.tally) }}{{ tally_counts(votes.tally) }}</div>
+        {% else %}<span class="sample">Counts unlock when an admin closes the session.</span>{% endif %}
+      </div>
+      {% endif %}
+      {% for d, t in votes.past %}
+      <div class="ivrow">
+        <a href="/decisions/sessions/{{ d.id }}#ap-{{ ap.id }}"><b>{{ d.name }}</b></a>
+        <div class="tline">{{ tally_bar(t) }}{{ tally_counts(t) }}</div>
+        <span class="verdict {{ t.verdict }}">{{ VERDICT_LABELS[t.verdict] }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
 
     {% if ap.notes_list %}
     <details class="panel" style="padding:14px;margin-top:12px">

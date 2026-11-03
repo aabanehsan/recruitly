@@ -43,13 +43,13 @@ def test_import_preview_then_confirm(client):
     assert "Import complete" in done.text
     board = client.get("/").text
     assert "Jordan Lee" in board and "Pri Raman" in board  # preferred name shown
-    assert board.count('class="card"') == 10
+    assert board.count('class="card"') == 13
 
     # re-importing the same file updates instead of duplicating
     token_url, html = import_sample(client)
-    assert re.search(r"<b>10</b><span>updates to existing", html)
+    assert re.search(r"<b>13</b><span>updates to existing", html)
     client.post(token_url + "/confirm")
-    assert client.get("/").text.count('class="card"') == 10
+    assert client.get("/").text.count('class="card"') == 13
 
 
 def test_profile_shows_cleaned_values_and_notes(client):
@@ -121,7 +121,7 @@ def test_bulk_headshots_zip(client):
     r = client.post("/headshots-bulk", files={"file": ("h.zip", SAMPLE.joinpath("headshots.zip").read_bytes(),
                                                        "application/zip")})
     assert r.status_code == 200
-    assert re.search(r"<b>8</b><span>headshots saved", r.text)  # Marcus's apostrophe included
+    assert re.search(r"<b>11</b><span>headshots saved", r.text)  # Marcus's apostrophe included
     assert "Someone Else" in r.text                              # stranger's photo not matched
 
     r = client.post("/headshots-bulk", files={"file": ("h.zip", b"garbage", "application/zip")})
@@ -134,7 +134,7 @@ def test_export_csv(client):
     r = client.get("/export.csv")
     assert r.headers["content-type"].startswith("text/csv")
     assert r.text.splitlines()[0].startswith("id,first_name,last_name")
-    assert len(r.text.strip().splitlines()) == 11
+    assert len(r.text.strip().splitlines()) == 14
 
 
 def test_sheet_link_conversion():
