@@ -20,6 +20,7 @@ from .accounts import register_account_routes
 from .config import settings
 from .db import get_session, init_db, session_scope
 from .decisions import forget_applicant_votes, profile_votes, register_decision_routes
+from .emails import ensure_email_templates, profile_templates, register_email_routes
 from .models import LONG_TEXT_FIELDS, PROFILE_FIELDS, Applicant, Status
 from .schedule import (
     applicant_interviews, forget_applicant, next_interviews, now_local, open_upcoming_slots, register_schedule_routes,
@@ -33,6 +34,7 @@ from .services.scoring import sort_by_score
 from .services.importer import (
     PROFILE_KEYS, ImportError_, apply_preview, build_preview, fetch_sheet, load_preview, read_csv, save_preview,
 )
+from .sync import record_sync, register_sync_routes, save_sheet_url, sync_state
 from .web import HERE, LoginRequired, csrf_protect, current_user, redirect, require_admin, templates
 
 HEADSHOT_NAME = re.compile(r"^[A-Za-z0-9_-]{1,80}\.(jpg|jpeg|png|webp)$")
@@ -47,6 +49,7 @@ def create_app() -> FastAPI:
     init_db()
     with session_scope() as s:
         ensure_rounds(s)
+        ensure_email_templates(s)
     app = FastAPI(title="Recruitly", version=__version__, dependencies=[Depends(csrf_protect)],
                   docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(SessionMiddleware, secret_key=settings.secret_key, session_cookie="recruitly_session",
@@ -69,6 +72,8 @@ def create_app() -> FastAPI:
     register_schedule_routes(app)
     register_scoring_routes(app)
     register_decision_routes(app)
+    register_sync_routes(app)
+    register_email_routes(app)
     register_routes(app)
     return app
 
@@ -157,6 +162,7 @@ def register_routes(app: FastAPI) -> None:
             "open_slots": open_upcoming_slots(session) if request.state.user.is_admin else [],
             "sc": profile_scores(session, ap, request.state.user),
             "votes": profile_votes(session, ap, request.state.user),
+            "email_templates": profile_templates(session) if request.state.user.is_admin else [],
         })
 
     @app.get("/applicants/{applicant_id}/edit", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
@@ -221,21 +227,27 @@ def register_routes(app: FastAPI) -> None:
     # ------------------------------------------------------------ import
 
     @app.get("/import", response_class=HTMLResponse, dependencies=[Depends(require_admin)])
-    def import_page(request: Request, error: str = ""):
-        return templates.TemplateResponse(request, "import.html", {"error": error})
+    def import_page(request: Request, error: str = "", msg: str = "", session: Session = Depends(get_session)):
+        return templates.TemplateResponse(request, "import.html", {"error": error, "msg": msg,
+                                                                   "sync": sync_state(session)})
 
     @app.post("/import", dependencies=[Depends(require_admin)])
     async def import_upload(file: UploadFile | None = File(None), sheet_url: str = Form(""),
-                            session: Session = Depends(get_session)):
+                            save_link: str = Form(""), session: Session = Depends(get_session)):
+        sync = False
         try:
             if sheet_url.strip():
                 data, name = fetch_sheet(sheet_url.strip()), "Google Sheet"
+                if save_link:
+                    save_sheet_url(session, sheet_url)
+                    session.commit()
+                    sync = True
             elif file is not None and file.filename:
                 data, name = await file.read(), file.filename
             else:
                 raise ImportError_("choose a CSV file or paste a Google Sheets link")
             headers, rows = read_csv(data)
-            pv = build_preview(session, headers, rows, name, email_domain=settings.email_domain)
+            pv = build_preview(session, headers, rows, name, email_domain=settings.email_domain, sync=sync)
             save_preview(session, pv)
         except ImportError_ as e:
             return redirect("/import", error=str(e))
@@ -263,7 +275,7 @@ def register_routes(app: FastAPI) -> None:
             val = str(form.get(f"col_{i}", ""))
             mapping[h] = val if val in HEADER_KEYWORDS else None
         pv = build_preview(session, pv.headers, pv.raw_rows, pv.source_name, mapping=mapping,
-                           email_domain=settings.email_domain, token=token)
+                           email_domain=settings.email_domain, token=token, sync=pv.sync)
         save_preview(session, pv)
         return redirect(f"/import/{token}")
 
@@ -274,7 +286,9 @@ def register_routes(app: FastAPI) -> None:
             summary = apply_preview(session, pv, fetch_headshots=settings.fetch_headshots)
         except ImportError_ as e:
             return redirect(f"/import/{token}" if "expired" not in str(e) else "/import", error=str(e))
-        return templates.TemplateResponse(request, "import_done.html", {"s": summary})
+        if pv.sync:
+            record_sync(session, pv, summary.created, summary.updated, summary.unchanged)
+        return templates.TemplateResponse(request, "import_done.html", {"s": summary, "sync": pv.sync})
 
     # ------------------------------------------------------------ bulk headshots
 

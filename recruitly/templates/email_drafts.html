@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ t.name }} drafts{% endblock %}
+{% block content %}
+<div class="headrow">
+  <div>
+    <h1>{{ t.name }}</h1>
+    <p class="sub" style="margin:0">
+      {% if single %}Draft for <a href="/applicants/{{ single.id }}">{{ single.display_name }}</a>.
+      {% else %}{{ drafts|length }} draft{{ '' if drafts|length == 1 else 's' }} for {{ AUDIENCE_LABELS[audience]|lower }}.{% endif %}
+      Nothing is sent from Recruitly.
+    </p>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btn" href="/emails/{{ t.id }}/edit">Edit template</a>
+    <a class="btn" href="/emails">All templates</a>
+  </div>
+</div>
+
+{% if not single %}
+<form class="toolbar" method="get" action="/emails/{{ t.id }}/drafts">
+  <label for="aud" class="sr">Who</label>
+  <select id="aud" name="audience" onchange="this.form.submit()" style="max-width:340px">
+    {% for v, label in audiences %}<option value="{{ v }}" {{ 'selected' if audience == v }}>{{ label }} ({{ counts.get(v, 0) }})</option>{% endfor %}
+  </select>
+  <noscript><button class="btn" type="submit">Show</button></noscript>
+  {% if all_to %}<button class="btn small" type="button" data-copy="all-to">Copy all {{ drafts|length }} addresses</button>
+  <textarea id="all-to" class="offscreen" readonly aria-hidden="true" tabindex="-1">{{ all_to }}</textarea>{% endif %}
+</form>
+{% endif %}
+
+{% for d in drafts %}
+<article class="panel draft" id="draft-{{ d.applicant_id }}">
+  <div class="drafthead">
+    <div>
+      <a href="/applicants/{{ d.applicant_id }}"><b>{{ d.name }}</b></a>
+      <div class="sample">{{ d.to or 'No email address' }}</div>
+    </div>
+    <div class="tplact">
+      {% if d.to %}<a class="btn primary small" href="{{ d.mailto }}">Open in email app</a>{% endif %}
+      <button class="btn small" type="button" data-copy="body-{{ d.applicant_id }}">Copy body</button>
+    </div>
+  </div>
+  {% if d.missing %}
+  <div class="fwarn">Fill in by hand: {% for m in d.missing %}<code>{{ '{' ~ m ~ '}' }}</code>{{ ', ' if not loop.last }}{% endfor %}{% if d.missing|select('in', ['slot_time', 'slot_date', 'slot_length', 'slot_location'])|list %} (no upcoming interview booked){% endif %}</div>
+  {% endif %}
+  {% if d.to and d.mailto_too_long %}<div class="hint">Long email: some email apps cut off the body when opening the link, so copy it instead.</div>{% endif %}
+  <label class="dlabel" for="subj-{{ d.applicant_id }}">Subject <button class="linkbtn" type="button" data-copy="subj-{{ d.applicant_id }}">Copy</button></label>
+  <textarea id="subj-{{ d.applicant_id }}" class="dsubj" readonly rows="1">{{ d.subject }}</textarea>
+  <label class="dlabel" for="body-{{ d.applicant_id }}">Body</label>
+  <textarea id="body-{{ d.applicant_id }}" class="dbody" readonly rows="{{ [d.body.count('\n') + 2, 18]|min }}">{{ d.body }}</textarea>
+</article>
+{% else %}
+<div class="panel"><p class="sample" style="margin:0">
+  {% if audience == 'interview' %}No one is booked for an upcoming interview. Book people on the <a href="/schedule">schedule</a>.
+  {% else %}No applicants match. Pick a different group above.{% endif %}
+</p></div>
+{% endfor %}
+
+<script>
+document.addEventListener("click", function (e) {
+  var btn = e.target.closest("[data-copy]");
+  if (!btn) return;
+  var el = document.getElementById(btn.getAttribute("data-copy"));
+  var done = function () { var t = btn.textContent; btn.textContent = "Copied"; setTimeout(function () { btn.textContent = t; }, 1400); };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(el.value).then(done);
+  } else {
+    el.select(); document.execCommand("copy"); done();
+  }
+});
+</script>
+{% endblock %}

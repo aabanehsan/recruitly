@@ -93,3 +93,8 @@ DEMO_DELIBERATIONS = [
         "mateo.garcia@gmail.com": {R: "no", S: "no"},
     }, {}),
 ]
+
+# The demo's saved Google Sheets link. It isn't a real sheet: syncing it reads sample_data/sheet_sync.csv,
+# which has the original responses plus two new applicants and two people who edited their answers.
+DEMO_SHEET_URL = "https://docs.google.com/spreadsheets/d/1RecruitlyDemoSheet0000000000000000000000/edit#gid=0"
+DEMO_LAST_SYNC_HOURS = 26

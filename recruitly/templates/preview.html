@@ -5,12 +5,12 @@
 {% set c = pv.counts %}
 <div class="headrow">
   <div>
-    <h1>Review import</h1>
-    <p class="sub" style="margin:0">{{ pv.rows|length }} responses from {{ pv.source_name }}. Nothing is saved until you confirm.</p>
+    <h1>{{ 'Review sync' if pv.sync else 'Review import' }}</h1>
+    <p class="sub" style="margin:0">{{ pv.rows|length }} responses from {{ 'your saved Google Sheet' if pv.sync else pv.source_name }}. Nothing is saved until you confirm.</p>
   </div>
   <form method="post" action="/import/{{ pv.token }}/confirm">{{ csrf_field }}
     <button class="btn primary" type="submit" {{ 'disabled' if pv.problems or not (c['create'] + c['update']) }}>
-      Import {{ c['create'] + c['update'] }} applicant{{ '' if c['create'] + c['update'] == 1 else 's' }}
+      {{ 'Sync' if pv.sync else 'Import' }} {{ c['create'] + c['update'] }} applicant{{ '' if c['create'] + c['update'] == 1 else 's' }}
     </button>
   </form>
 </div>
@@ -21,6 +21,7 @@
 <div class="stats">
   <div class="stat"><b>{{ c['create'] }}</b><span>new profiles</span></div>
   <div class="stat"><b>{{ c['update'] }}</b><span>updates to existing</span></div>
+  <div class="stat"><b>{{ c['unchanged'] }}</b><span>unchanged</span></div>
   <div class="stat"><b>{{ c['fixed'] }}</b><span>values cleaned up</span></div>
   <div class="stat"><b>{{ c['warning'] }}</b><span>warnings to check</span></div>
   <div class="stat"><b>{{ c['skip'] }}</b><span>rows skipped (errors)</span></div>
@@ -60,7 +61,7 @@
   <table>
     <thead><tr><th>Row</th><th>Applicant</th><th>Major / year</th><th>Action</th><th>Cleanup &amp; issues</th></tr></thead>
     <tbody>
-    {% for r in pv.rows %}
+    {% for r in pv.rows if not (pv.sync and r.action in ('unchanged', 'duplicate')) %}
       {% set v = r.values %}
       <tr>
         <td>{{ r.row_num }}</td>
@@ -69,8 +70,16 @@
         <td><span class="pill {{ r.action }}">{{ r.action }}</span>{% if r.reason %}<br><span class="sample">{{ r.reason }}</span>{% endif %}</td>
         <td>{{ issue_list(r.issues) if r.issues else '' }}{% if not r.issues %}<span class="sample">Clean</span>{% endif %}</td>
       </tr>
+    {% else %}
+      <tr><td colspan="5" class="sample">No new or changed responses.</td></tr>
     {% endfor %}
     </tbody>
   </table>
 </div>
+{% if pv.sync and (c['unchanged'] or c['duplicate']) %}
+<p class="sample" style="margin-top:10px">Hidden:
+  {%- if c['unchanged'] %} {{ c['unchanged'] }} response{{ '' if c['unchanged'] == 1 else 's' }} with no changes{% endif %}
+  {%- if c['unchanged'] and c['duplicate'] %} and{% endif %}
+  {%- if c['duplicate'] %} {{ c['duplicate'] }} older duplicate submission{{ '' if c['duplicate'] == 1 else 's' }}{% endif %}.</p>
+{% endif %}
 {% endblock %}

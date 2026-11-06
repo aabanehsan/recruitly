@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Email templates{% endblock %}
+{% block content %}
+<div class="headrow">
+  <div>
+    <h1>Email templates</h1>
+    <p class="sub" style="margin:0">Write an email once, then get a ready-to-send draft for every applicant. Recruitly never sends email by itself: you copy each draft or open it in your email app.</p>
+  </div>
+  <a class="btn primary" href="/emails/new">New template</a>
+</div>
+
+<div class="tplgrid">
+  <div class="tpllist">
+  {% for t in templates_ %}
+    <section class="panel tpl" id="tpl-{{ t.id }}">
+      <div class="tplhead">
+        <div>
+          <h2>{{ t.name }}</h2>
+          <span class="sample">For: {{ AUDIENCE_LABELS.get(t.audience, t.audience) }} · {{ counts.get(t.audience, 0) }} applicant{{ '' if counts.get(t.audience, 0) == 1 else 's' }}</span>
+        </div>
+        <div class="tplact">
+          <a class="btn primary small" href="/emails/{{ t.id }}/drafts">Make drafts</a>
+          <a class="btn small" href="/emails/{{ t.id }}/edit">Edit</a>
+        </div>
+      </div>
+      <div class="tplsubj"><span class="sample">Subject</span> {{ t.subject }}</div>
+      <pre class="tplbody">{{ t.body|truncate(260) }}</pre>
+    </section>
+  {% else %}
+    <div class="panel"><p class="sample" style="margin:0">No templates yet. <a href="/emails/new">Write one</a> for interview invites, offers or rejections.</p></div>
+  {% endfor %}
+  </div>
+
+  <aside class="panel phlist">
+    <h2>Placeholders</h2>
+    <p class="sample" style="margin:0 0 10px">Put these in a subject or body and they're filled in per applicant. Write <code>{{ '{{' }}</code> for a literal brace.</p>
+    <dl>
+      {% for name, desc in placeholders.items() %}<dt><code>{{ '{' ~ name ~ '}' }}</code></dt><dd>{{ desc }}</dd>{% endfor %}
+    </dl>
+  </aside>
+</div>
+{% endblock %}

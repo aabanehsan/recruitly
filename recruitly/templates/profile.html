@@ -107,6 +107,15 @@
     </div>
     {% endif %}
 
+    {% if me.is_admin and email_templates %}
+    <div class="panel ivpanel">
+      <h2>Email drafts</h2>
+      <div class="emailpick">
+        {% for t in email_templates %}<a class="btn small" href="/emails/{{ t.id }}/drafts?applicant={{ ap.id }}">{{ t.name }}</a>{% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     {% if ap.notes_list %}
     <details class="panel" style="padding:14px;margin-top:12px">
       <summary>Cleaned on import ({{ ap.notes_list|length }})</summary>

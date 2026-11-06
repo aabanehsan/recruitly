@@ -23,6 +23,7 @@
       <a href="/headshots-bulk" class="{{ 'on' if path.startswith('/headshots-bulk') }}">Headshots</a>
       <a href="/applicants/new" class="{{ 'on' if path == '/applicants/new' }}">Add</a>
       <a href="/members" class="{{ 'on' if path.startswith('/members') }}">Members</a>
+      <a href="/emails" class="{{ 'on' if path.startswith('/emails') }}">Emails</a>
       {% endif %}
     </nav>
     <div class="who">
@@ -30,6 +31,7 @@
         <span class="mini">{{ me.initials }}</span><span class="nm">{{ me.name }}</span>
         <span class="role {{ me.role }}">{{ me.role }}</span>
       </a>
+      {% if me.is_admin %}<a href="/settings" class="linkbtn setlink {{ 'on' if path.startswith('/settings') }}">Settings</a>{% endif %}
       <form method="post" action="/logout">{{ csrf_field }}<button class="linkbtn" type="submit">Log out</button></form>
     </div>
     {% endif %}

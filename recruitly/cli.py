@@ -192,6 +192,35 @@ def load_demo_votes() -> None:
         print(f"  Added demo deliberations: {len(DEMO_DELIBERATIONS)} sessions (one still open), {votes} votes.")
 
 
+def load_demo_sync() -> None:
+    """Save the demo's Google Sheets link as if it was last synced yesterday (its sync reads a bundled CSV)."""
+    import json
+    from datetime import timedelta
+
+    from .db import init_db, session_scope
+    from .demo import DEMO_LAST_SYNC_HOURS, DEMO_SHEET_URL
+    from sqlalchemy import func, select
+
+    from .models import Applicant, utcnow
+    from .sync import LAST_RESULT, LAST_SYNCED, SHEET_MAPPING, SHEET_URL, get_setting, set_setting
+    from .services.cleaning import map_headers
+    from .services.importer import read_csv
+
+    init_db()
+    with session_scope() as s:
+        if get_setting(s, SHEET_URL):
+            return
+        sample = resources.files("recruitly").joinpath("sample_data", "form_responses.csv").read_bytes()
+        headers, _ = read_csv(sample)
+        set_setting(s, SHEET_URL, DEMO_SHEET_URL)
+        set_setting(s, SHEET_MAPPING, json.dumps(map_headers(headers)))
+        set_setting(s, LAST_SYNCED, (utcnow() - timedelta(hours=DEMO_LAST_SYNC_HOURS)).isoformat())
+        imported = s.scalar(select(func.count(Applicant.id)))
+        set_setting(s, LAST_RESULT, f"{imported} new, 0 updated, 0 unchanged")
+        s.commit()
+        print("  Saved a demo Google Sheets link: Settings → Sync now pulls in 2 new and 2 edited responses.")
+
+
 def print_demo_accounts(accounts) -> None:
     if not accounts:
         return
@@ -246,7 +275,7 @@ def import_file(path: str, yes: bool) -> int:
         if pv.problems:
             return 2
         c = pv.counts
-        print(f"  {len(pv.rows)} rows: {c['create']} new, {c['update']} updates, {c['skip']} skipped, "
+        print(f"  {len(pv.rows)} rows: {c['create']} new, {c['update']} updates, {c['unchanged']} unchanged, {c['skip']} skipped, "
               f"{c['duplicate']} duplicates, {c['fixed']} values cleaned, {c['warning']} warnings")
         for r in pv.rows:
             if r.action in ("skip", "duplicate"):
@@ -255,7 +284,8 @@ def import_file(path: str, yes: bool) -> int:
             print("  Cancelled.")
             return 1
         summary = apply_preview(s, pv, fetch_headshots=settings.fetch_headshots)
-        print(f"  Done: {summary.created} created, {summary.updated} updated, {summary.headshots_saved} headshots.")
+        print(f"  Done: {summary.created} created, {summary.updated} updated, {summary.unchanged} unchanged, "
+              f"{summary.headshots_saved} headshots.")
     return 0
 
 
@@ -291,6 +321,7 @@ def main(argv: list[str] | None = None) -> int:
             load_demo_schedule()
             load_demo_scores()
             load_demo_votes()
+            load_demo_sync()
         print_demo_accounts(accounts)
         settings.demo = bool(accounts)
     serve(args.host, args.port, not args.no_browser)

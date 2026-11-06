@@ -45,9 +45,10 @@ def test_import_preview_then_confirm(client):
     assert "Jordan Lee" in board and "Pri Raman" in board  # preferred name shown
     assert board.count('class="card"') == 13
 
-    # re-importing the same file updates instead of duplicating
+    # re-importing the same file matches everyone instead of duplicating, and nothing changed
     token_url, html = import_sample(client)
-    assert re.search(r"<b>13</b><span>updates to existing", html)
+    assert re.search(r"<b>0</b><span>updates to existing", html)
+    assert re.search(r"<b>13</b><span>unchanged", html)
     client.post(token_url + "/confirm")
     assert client.get("/").text.count('class="card"') == 13
 

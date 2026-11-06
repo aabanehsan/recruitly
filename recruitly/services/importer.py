@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 from ..models import Applicant, ImportPreview
 from .cleaning import HEADER_KEYWORDS, clean_row, map_headers
 from .headshots import HeadshotError, download_url, save_headshot
+from .sync import changed_fields, describe_changes
 
 MAPPABLE_FIELDS = list(HEADER_KEYWORDS)
 PROFILE_KEYS = [
@@ -91,9 +92,10 @@ class PreviewRow:
     row_num: int
     values: dict[str, Any]
     issues: list[dict[str, str]]
-    action: str  # create | update | skip | duplicate
+    action: str  # create | update | unchanged | skip | duplicate
     existing_id: int | None = None
     reason: str = ""
+    changes: list[str] = field(default_factory=list)  # fields an update overwrites
 
 
 @dataclass
@@ -105,10 +107,11 @@ class Preview:
     mapping: dict[str, str | None]
     rows: list[PreviewRow] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
+    sync: bool = False  # came from the saved Google Sheet (settings → Sheets sync)
 
     @property
     def counts(self) -> dict[str, int]:
-        c = {"create": 0, "update": 0, "skip": 0, "duplicate": 0, "fixed": 0, "warning": 0}
+        c = {"create": 0, "update": 0, "unchanged": 0, "skip": 0, "duplicate": 0, "fixed": 0, "warning": 0}
         for r in self.rows:
             c[r.action] += 1
             c["fixed"] += sum(1 for i in r.issues if i["level"] == "fixed")
@@ -116,7 +119,8 @@ class Preview:
         return c
 
     def to_json(self) -> str:
-        return json.dumps({"headers": self.headers, "raw_rows": self.raw_rows, "mapping": self.mapping})
+        return json.dumps({"headers": self.headers, "raw_rows": self.raw_rows, "mapping": self.mapping,
+                           "sync": self.sync})
 
 
 def build_preview(
@@ -127,9 +131,10 @@ def build_preview(
     mapping: dict[str, str | None] | None = None,
     email_domain: str | None = None,
     token: str | None = None,
+    sync: bool = False,
 ) -> Preview:
     mapping = mapping or map_headers(headers)
-    pv = Preview(token or secrets.token_urlsafe(16), source_name, headers, raw_rows, mapping)
+    pv = Preview(token or secrets.token_urlsafe(16), source_name, headers, raw_rows, mapping, sync=sync)
 
     mapped = set(v for v in mapping.values() if v)
     if "email" not in mapped:
@@ -164,14 +169,21 @@ def build_preview(
         else:
             pr.action, pr.reason = "duplicate", f"newer submission in row {prev.row_num}"
 
-    # Existing applicants → update instead of create.
+    # Existing applicants → update instead of create (or nothing at all, if no answer changed).
     for pr in latest.values():
         email, eid = pr.values.get("email"), pr.values.get("eid")
         conds = [Applicant.email == email] + ([Applicant.eid == eid] if eid else [])
         existing = session.scalars(select(Applicant).where(or_(*conds))).first()
         if existing:
-            pr.action, pr.existing_id = "update", existing.id
-            pr.reason = f"matches existing profile #{existing.id} ({existing.display_name})"
+            pr.existing_id = existing.id
+            pr.changes = changed_fields({k: getattr(existing, k) for k in [*PROFILE_KEYS, "headshot_source"]},
+                                        pr.values)
+            if pr.changes:
+                pr.action = "update"
+                pr.reason = f"{existing.display_name} (#{existing.id}) changed: {describe_changes(pr.changes)}"
+            else:
+                pr.action = "unchanged"
+                pr.reason = f"same answers as {existing.display_name} (#{existing.id})"
 
     pv.rows = cleaned
     return pv
@@ -193,7 +205,8 @@ def load_preview(session: Session, token: str, email_domain: str | None = None,
         raise ImportError_("this import preview expired; upload the file again")
     data = json.loads(stored.payload)
     return build_preview(session, data["headers"], data["raw_rows"], stored.source_name,
-                         mapping=mapping or data["mapping"], email_domain=email_domain, token=token)
+                         mapping=mapping or data["mapping"], email_domain=email_domain, token=token,
+                         sync=bool(data.get("sync")))
 
 
 # ---------------------------------------------------------------- apply
@@ -203,6 +216,7 @@ def load_preview(session: Session, token: str, email_domain: str | None = None,
 class ImportSummary:
     created: int = 0
     updated: int = 0
+    unchanged: int = 0
     skipped: int = 0
     headshots_saved: int = 0
     headshots_missing: list[str] = field(default_factory=list)
@@ -217,6 +231,9 @@ def apply_preview(session: Session, pv: Preview, fetch_headshots: bool = True,
     for pr in pv.rows:
         if pr.action in ("skip", "duplicate"):
             summary.skipped += 1
+            continue
+        if pr.action == "unchanged":
+            summary.unchanged += 1
             continue
         v = pr.values
         ap = session.get(Applicant, pr.existing_id) if pr.existing_id else None

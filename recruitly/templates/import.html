@@ -5,6 +5,18 @@
 <p class="sub">Bring in your Google Form responses. You'll see a preview of every cleaned row before anything is saved.</p>
 {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
 
+{% if sync.url %}
+<div class="panel syncbox" style="margin-bottom:18px">
+  <div>
+    <b>Saved Google Sheet</b> <span class="sample">· {{ 'synced ' ~ (sync.last|ago) if sync.last else 'not synced yet' }}{% if sync.result %} ({{ sync.result }}){% endif %}</span>
+    <div class="sample">Pull in new and edited responses from the sheet in <a href="/settings">Settings</a>.</div>
+  </div>
+  <form method="post" action="/sync">{{ csrf_field }}<input type="hidden" name="next" value="/import">
+    <button class="btn primary" type="submit">Sync now</button>
+  </form>
+</div>
+{% endif %}
+
 <div class="two">
   <form class="panel" method="post" action="/import" enctype="multipart/form-data">{{ csrf_field }}
     <h2>Upload a CSV</h2>
@@ -22,9 +34,10 @@
     <ol class="steps">
       <li>In the responses sheet click <b>Share</b>.</li>
       <li>Under General access pick <b>Anyone with the link → Viewer</b>.</li>
-      <li>Copy the link and paste it below. Running the import again later only adds new people and updates changed answers.</li>
+      <li>Copy the link and paste it below. Syncing again later only adds new people and updates changed answers.</li>
     </ol>
     <div style="margin-top:14px"><input type="url" name="sheet_url" placeholder="https://docs.google.com/spreadsheets/d/…" required aria-label="Google Sheets link"></div>
+    <label class="check" style="margin-top:10px"><input type="checkbox" name="save_link" value="1" {{ 'checked' if not sync.url }}> Save this link for one-click sync later</label>
     <div class="actions"><button class="btn primary" type="submit">Preview import</button></div>
   </form>
 </div>

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+<p class="sub">Connect your form's responses sheet once, then pull in new and edited responses with one click.</p>
+{% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+
+<div class="two settings">
+  <section class="panel">
+    <h2>Google Sheets sync</h2>
+    {% if sync.url %}
+    <div class="syncbox">
+      <div>
+        <b>{{ 'Synced ' ~ (sync.last|ago) if sync.last else 'Not synced yet' }}</b>
+        {% if sync.last %}<div class="sample">{{ sync.last|local|longdate }}{% if sync.result %} · {{ sync.result }}{% endif %}</div>{% endif %}
+        <div class="sample syncurl">{{ sync.url }}</div>
+      </div>
+      <form method="post" action="/sync">{{ csrf_field }}
+        <button class="btn primary" type="submit">Sync now</button>
+      </form>
+    </div>
+    <p class="sample" style="margin:12px 0 0">Sync opens the usual import preview: new responses are added, people who edited their answers are updated, and nothing is saved until you confirm.</p>
+    {% endif %}
+
+    <form method="post" action="/settings/sheet" style="margin-top:16px">{{ csrf_field }}
+      <label for="sheet_url">Responses sheet link</label>
+      <input id="sheet_url" type="url" name="sheet_url" value="{{ sync.url }}" placeholder="https://docs.google.com/spreadsheets/d/…">
+      <div class="hint">The sheet must be shared as <b>Anyone with the link → Viewer</b>. Leave blank and save to disconnect.</div>
+      <div class="actions"><button class="btn" type="submit">Save link</button></div>
+    </form>
+    {% if settings.demo and sync.url == demo_url %}
+    <p class="sample" style="margin:14px 0 0">Demo: this link isn't a real sheet. Syncing reads a bundled copy with two new applicants and two edited responses.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h2>Email templates</h2>
+    <p class="sample" style="margin:0 0 12px">Interview invites, offers and rejections with placeholders like <code>{first_name}</code> and <code>{slot_time}</code>. Recruitly makes a draft for each applicant that you copy or open in your email app. It never sends email by itself.</p>
+    <a class="btn" href="/emails">Edit templates</a>
+
+    <h2 style="margin-top:22px">Set when starting Recruitly</h2>
+    <dl class="kv small">
+      <dt>Org name</dt><dd>{{ settings.org_name }} <span class="sample">RECRUITLY_ORG_NAME</span></dd>
+      <dt>Cycle</dt><dd>{{ settings.cycle_name }} <span class="sample">RECRUITLY_CYCLE</span></dd>
+      <dt>Time zone</dt><dd>{{ settings.timezone }} <span class="sample">RECRUITLY_TIMEZONE</span></dd>
+      <dt>Email domain</dt><dd>{{ settings.email_domain or 'Any' }} <span class="sample">RECRUITLY_EMAIL_DOMAIN</span></dd>
+    </dl>
+  </section>
+</div>
+{% endblock %}

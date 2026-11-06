@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit ' ~ t.name if t else 'New email template' }}{% endblock %}
+{% block content %}
+<h1>{{ 'Edit “' ~ t.name ~ '”' if t else 'New email template' }}</h1>
+<p class="sub">Placeholders in curly braces are filled in for each applicant when you make drafts.</p>
+{% if errors %}<div class="flash err">Not saved. Fix the highlighted fields and try again.</div>{% endif %}
+
+<div class="tplgrid">
+  <form class="panel" method="post" action="{{ '/emails/' ~ t.id ~ '/edit' if t else '/emails/new' }}">{{ csrf_field }}
+    <div class="fgrid">
+      <div>
+        <label for="e_name">Template name</label>
+        <input id="e_name" name="name" value="{{ values.name or '' }}" maxlength="60" required placeholder="e.g. Final round invite">
+        {% if errors.name %}<div class="ferr">{{ errors.name }}</div>{% endif %}
+      </div>
+      <div>
+        <label for="e_aud">Make drafts for</label>
+        <select id="e_aud" name="audience">
+          {% for v, label in audiences %}<option value="{{ v }}" {{ 'selected' if values.audience == v }}>{{ label }}</option>{% endfor %}
+        </select>
+        {% if errors.audience %}<div class="ferr">{{ errors.audience }}</div>{% else %}<div class="hint">You can pick other people when making drafts too.</div>{% endif %}
+      </div>
+      <div class="full">
+        <label for="e_subj">Subject</label>
+        <input id="e_subj" name="subject" value="{{ values.subject or '' }}" maxlength="200" required>
+        {% if errors.subject %}<div class="ferr">{{ errors.subject }}</div>{% endif %}
+      </div>
+      <div class="full">
+        <label for="e_body">Body</label>
+        <textarea id="e_body" name="body" rows="14" required class="mono">{{ values.body or '' }}</textarea>
+        {% if errors.body %}<div class="ferr">{{ errors.body }}</div>{% endif %}
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" type="submit">{{ 'Save template' if t else 'Add template' }}</button>
+      <a class="btn" href="/emails{{ '#tpl-' ~ t.id if t }}">Cancel</a>
+    </div>
+  </form>
+
+  <aside>
+    <div class="panel phlist">
+      <h2>Placeholders</h2>
+      <dl>
+        {% for name, desc in placeholders.items() %}<dt><code>{{ '{' ~ name ~ '}' }}</code></dt><dd>{{ desc }}</dd>{% endfor %}
+      </dl>
+    </div>
+    {% if t %}
+    <form method="post" action="/emails/{{ t.id }}/delete" style="margin-top:12px" onsubmit='return confirm({{ ("Delete the “" ~ t.name ~ "” template?")|tojson }})'>{{ csrf_field }}
+      <button class="btn small danger" type="submit">Delete template</button>
+    </form>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

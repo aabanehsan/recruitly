@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Import complete{% endblock %}
 {% block content %}
-<h1>Import complete</h1>
-<p class="sub">Profiles are ready on the board.</p>
+<h1>{{ 'Sync complete' if sync else 'Import complete' }}</h1>
+<p class="sub">Profiles are ready on the board.{% if sync %} The sheet's “last synced” time is updated in <a href="/settings">Settings</a>.{% endif %}</p>
 <div class="stats">
   <div class="stat"><b>{{ s.created }}</b><span>profiles created</span></div>
   <div class="stat"><b>{{ s.updated }}</b><span>profiles updated</span></div>
+  <div class="stat"><b>{{ s.unchanged }}</b><span>unchanged</span></div>
   <div class="stat"><b>{{ s.skipped }}</b><span>rows skipped</span></div>
   <div class="stat"><b>{{ s.headshots_saved }}</b><span>headshots saved</span></div>
 </div>

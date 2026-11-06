@@ -8,7 +8,17 @@ Applicant tracking for student org recruitment. Point it at your Google Form res
 
 Most orgs run recruitment out of a Google Form and a messy spreadsheet. Names come in as `jOHN`, majors as `cs`, `comp sci` and `Computer Science`, phone numbers in five formats, and someone always submits twice. Headshots end up in a Drive folder that nobody can match to the right row. Recruitly fixes all of that on import and gives you a board you can actually run rush from.
 
-## Features (v0.5)
+## Features (v0.6)
+
+- **Live Google Sheets sync.** Save your responses sheet's link once (in **Settings**, or by ticking *Save this link* on the Import page), then hit **Sync now** whenever new responses come in.
+  - Sync runs through the same preview as a normal import: new responses are added, people who edited their answers are updated (the preview says exactly which fields changed), and unchanged rows are left alone and hidden from the list. Nothing is saved until you confirm.
+  - Blank answers never erase data you already have, and if you fix a column mapping during a sync, the next sync remembers it.
+  - Settings and the Import page show when the sheet was last synced and what changed.
+
+- **Email templates.** Starter templates for **interview invites**, **offers** and **rejections** (edit them or add your own on **Emails**), with placeholders like `{first_name}`, `{slot_time}`, `{slot_location}` and `{sender_name}`.
+  - **Make drafts** fills in a template for everyone it's meant for: invites go to people booked for an upcoming interview, offers to *Offered*, rejections to *Cut*, or pick any status. Every applicant's profile also links to a draft of each template.
+  - Each draft has **Open in email app** (a `mailto:` link with the subject and body filled in) and copy buttons, plus *Copy all addresses* for a BCC. Drafts with a placeholder that can't be filled (say, an invite for someone without a slot) are flagged.
+  - Recruitly **never sends email by itself**.
 
 - **Decisions dashboard and voting.** The **Decisions** page ranks every applicant by average score, with their status, how many people scored them, and flags worth a second look: *Not scored* (interviewed but nobody submitted), *1 scorer*, *Split* (scorers more than 1.5 points apart) and *Draft pending*.
   - **Deliberations:** an admin opens a voting session (say, "First-round debrief"), everyone votes **yes / no / abstain** per applicant from the Decisions page or the profile, and the admin closes it. Click your vote again to take it back. Cut and declined applicants can't be voted on.
@@ -63,7 +73,7 @@ cd recruitly
 python3 run.py demo
 ```
 
-That one command sets up everything the first time, loads 15 sample form responses (fictional people, deliberately messy data), creates four demo logins, adds interview slots (yesterday's first round plus two days starting tomorrow), a four-criterion rubric with score sheets from yesterday's interviews, a closed screening vote (which cut four applicants) and an open first-round debrief, and opens the app at http://localhost:8000:
+That one command sets up everything the first time, loads 15 sample form responses (fictional people, deliberately messy data), creates four demo logins, adds interview slots (yesterday's first round plus two days starting tomorrow), a four-criterion rubric with score sheets from yesterday's interviews, a closed screening vote (which cut four applicants), an open first-round debrief and a saved Google Sheets link, and opens the app at http://localhost:8000:
 
 | Role | Email | Password |
 |---|---|---|
@@ -73,6 +83,8 @@ That one command sets up everything the first time, loads 15 sample form respons
 | Member | `sam@demo.recruitly.dev` | `demo-sam-2026` |
 
 They're printed in the terminal and shown on the login page too. Log in as the member to see the read-only view and the anchoring rule: Morgan can see everyone's scores for Danny and Grace (Morgan scored them) but not for Mateo, and Aisha still has an unfinished draft. On **Decisions**, Riley and Sam have already voted in the open debrief: the admin sees their tally, Morgan only sees a vote count until the admin closes it.
+
+As the admin, open **Settings → Sync now** to see a sync: the demo's sheet link isn't real, so it reads a bundled copy of the sheet with two new applicants and two people who edited their answers. **Emails → Interview invite → Make drafts** shows ready-to-send invites for everyone booked tomorrow.
 
 Use `python3 run.py` without `demo` to start fresh: the first page asks you to create the admin account, then you invite the rest of your exec team from **Members**.
 
@@ -89,6 +101,8 @@ recruitly demo          # or just: recruitly
 2. Either download the sheet as **.csv** and upload it on the Import page, or share it as "Anyone with the link" and paste the link.
 3. Review the preview, fix any column mappings, and click **Import**.
 4. For headshots: if Drive blocked the downloads (it usually does for private form uploads), download the form's upload folder from Drive as a zip and drop it on the **Headshots** page.
+
+To keep pulling in new responses, tick **Save this link for one-click sync** when you paste the link (or save it in **Settings**). From then on **Sync now** on the Import or Settings page fetches the sheet again and previews only what's new or changed.
 
 You can also import from the terminal:
 
@@ -127,6 +141,14 @@ Changing a weight re-calculates every average. Removing a criterion deletes its 
 
 Past sessions stay listed on the Decisions page and on each applicant's profile. Deleting a session deletes its votes.
 
+## Emails
+
+1. Open **Emails**. The invite, offer and rejection templates are ready to go; click **Edit** to change the wording. The placeholder list on the right shows everything you can use, and a typo like `{frist_name}` is caught when you save.
+2. Click **Make drafts**. Pick who the drafts are for if it's not the template's usual group.
+3. For each person, click **Open in email app** to get a filled-in email in Gmail, Outlook or Apple Mail, or copy the subject and body. Very long emails are better copied, since some email apps cut off long links.
+
+`{slot_time}`, `{slot_date}`, `{slot_length}` and `{slot_location}` come from the applicant's next booked interview. `{first_name}` uses their preferred name when they gave one.
+
 ## Configuration
 
 Set these as environment variables:
@@ -149,7 +171,7 @@ Set these as environment variables:
 - **SQLAlchemy 2.0** with SQLite by default
 - **Pillow** for headshot processing
 - **argon2-cffi** for password hashing and Starlette's signed session cookies for logins
-- Cleaning, account, scheduling, scoring and decision rules live in `recruitly/services/` as pure functions, so every rule is unit tested. A test checks that every route has an access rule, so a new page can't ship unprotected.
+- Cleaning, account, scheduling, scoring, decision, sync and email rules live in `recruitly/services/` as pure functions, so every rule is unit tested. A test checks that every route has an access rule, so a new page can't ship unprotected.
 
 ```
 recruitly/
@@ -158,19 +180,23 @@ recruitly/
   schedule.py         interview slots, booking, .ics export
   scoring.py          rubric, rounds and score sheet pages
   decisions.py        decisions dashboard, deliberations, votes, bulk status
+  sync.py             settings page, saved Google Sheet and one-click sync
+  emails.py           email templates and per-applicant drafts
   web.py              templates, current user, admin check, CSRF
   models.py           Applicant, ImportPreview, User, Invite, InterviewSlot, Round, Criterion, ScoreSheet, Score,
-                      Deliberation, Vote
+                      Deliberation, Vote, AppSetting, EmailTemplate
   services/
     auth.py           password hashing, roles, invite and login rules
     scheduling.py     slot parsing, double-booking checks, .ics building
     scoring.py        rubric parsing, weighted averages, who-sees-whose-scores rules
     decisions.py      ranking, flags, vote tallies and visibility, funnel and chart maths
+    sync.py           what changed between syncs, remembered column mappings, "synced 2 hours ago"
+    emails.py         placeholders, template checks, drafts and mailto: links
     cleaning.py       header mapping + field validation/cleanup
     importer.py       two-step import: preview, then apply
     headshots.py      Drive download, zip matching, crop/resize
   templates/          Jinja pages
-  sample_data/        demo form export and placeholder headshots
+  sample_data/        demo form export, a later copy for the sync demo, placeholder headshots
 tests/                pytest suite
 run.py                one-command setup + start
 ```
@@ -179,7 +205,7 @@ Run the tests with `pip install -e ".[dev]" && pytest`.
 
 ## Roadmap
 
-Live Google Sheets sync with email templates, then Docker and Postgres support, are planned. See [ROADMAP.md](ROADMAP.md).
+Next up: Docker, Postgres support and a v1.0 release. See [ROADMAP.md](ROADMAP.md).
 
 ## Privacy note
 

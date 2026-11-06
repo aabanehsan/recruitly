@@ -1,5 +1,5 @@
 """Regenerate recruitly/sample_data/: a deliberately messy Google Form export plus
-placeholder headshots. All people are fictional. Run: python scripts/make_sample_data.py"""
+placeholder headshots, and a later copy of the sheet for the sync demo. All people are fictional. Run: python scripts/make_sample_data.py"""
 
 from __future__ import annotations
 
@@ -81,6 +81,24 @@ PEOPLE = [
      "I've been skydiving.", "Weekday afternoons"),
 ]
 
+# sheet_sync.csv = the same sheet a few days later, for the demo's "Sync now": two new responses and two people
+# who edited theirs (Google Forms "edit after submit" updates the row and its timestamp).
+SYNC_NEW = [
+    ("Liam", "Ortiz", "", "liam.ortiz@utexas.edu", "lo40912", "512 555 0188", "statistics", "", "",
+     "Sophomore", "May 2028", "3.67", "El Paso, TX", "linkedin.com/in/liam-ortiz", "", "@liamortiz",
+     "Texas Data Science club, tutor at the Sanger Learning Center",
+     "I heard about the pro bono consulting projects at the org fair and want in.",
+     "I've beaten my dad at chess exactly once.", "Mon/Wed evenings"),
+    ("maya", "johnson", "", "Maya.Johnson@utexas.edu", "mj22871", "(214) 555-0103", "Marketing", "Plan II", "",
+     "freshman", "Spring 2030", "", "Dallas, TX", "", "", "",
+     "Plan II, Texas Women in Business freshman committee", "I want to learn how to run a real client project.",
+     "I've seen every Pixar movie in theaters.", "Thursdays after 4"),
+]
+SYNC_EDITS = {  # email in PEOPLE → {column index in the person tuple: new answer}
+    "priya.raman@utexas.edu": {19: "Weekdays after 5, not Fridays"},
+    "sofia.delgado@utexas.edu": {11: "3.52", 16: "IEEE, Society of Women Engineers, power systems research lab, Longhorn Racing"},
+}
+
 
 def headshot(seed: int) -> bytes:
     rng = random.Random(seed)
@@ -117,6 +135,22 @@ def main() -> None:
         w = csv.writer(fh)
         w.writerow(HEADERS)
         w.writerows(rows)
+
+    sync_rows = []
+    for row, p in zip(rows, PEOPLE):
+        edits = SYNC_EDITS.get(p[3])
+        if edits:
+            p = list(p)
+            for col, val in edits.items():
+                p[col] = val
+            row = ["11/3/2026 20:41:09", p[3], p[0], p[1], p[2], *p[4:], row[-1]]
+        sync_rows.append(row)
+    for i, p in enumerate(SYNC_NEW):
+        sync_rows.append([f"11/{4 + i}/2026 {19 + i}:12:30", p[3], p[0], p[1], p[2], *p[4:], ""])
+    with open(OUT / "sheet_sync.csv", "w", newline="", encoding="utf-8") as fh:
+        w = csv.writer(fh)
+        w.writerow(HEADERS)
+        w.writerows(sync_rows)
 
     with zipfile.ZipFile(OUT / "headshots.zip", "w", zipfile.ZIP_DEFLATED) as zf:
         for i, p in enumerate(PEOPLE):
