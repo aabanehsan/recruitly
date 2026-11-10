@@ -193,7 +193,11 @@ def test_session_cookie_is_signed_and_httponly(client, anon):
     set_cookie = r.headers["set-cookie"].lower()
     assert "recruitly_session=" in set_cookie and "httponly" in set_cookie and "samesite=lax" in set_cookie
     value = client.cookies["recruitly_session"]
-    client.cookies.set("recruitly_session", value[:-4] + "AAAA")  # tampered signature
+    # replace the cookie in place: setting a second one with no domain would leave the valid cookie in the jar too,
+    # and which of the two gets sent first differs between Python versions
+    domain = next(c.domain for c in client.cookies.jar if c.name == "recruitly_session")
+    client.cookies.clear()
+    client.cookies.set("recruitly_session", value[:-4] + "AAAA", domain=domain)  # tampered signature
     assert is_login_redirect(client.get("/", follow_redirects=False))
 
 
