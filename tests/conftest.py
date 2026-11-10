@@ -1,3 +1,4 @@
+import os
 import re
 
 import pytest
@@ -14,7 +15,16 @@ def app(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "data_dir", tmp_path)
     monkeypatch.setattr(settings, "fetch_headshots", False)
     monkeypatch.setattr(settings, "demo", False)
-    monkeypatch.delenv("RECRUITLY_DB_URL", raising=False)
+    test_db = os.environ.get("RECRUITLY_TEST_DB_URL")
+    if test_db:
+        # run the whole suite against another database, e.g. Postgres in CI. Each test starts from empty tables.
+        from recruitly.db import Base, get_engine, init_db
+
+        monkeypatch.setenv("RECRUITLY_DB_URL", test_db)
+        init_db()
+        Base.metadata.drop_all(get_engine())
+    else:
+        monkeypatch.delenv("RECRUITLY_DB_URL", raising=False)
     monkeypatch.delenv("RECRUITLY_SECRET_KEY", raising=False)
     accounts.throttle._failures.clear()
     from recruitly.app import create_app

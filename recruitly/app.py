@@ -7,9 +7,9 @@ import io
 import re
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.exception_handlers import http_exception_handler
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -67,6 +67,16 @@ def create_app() -> FastAPI:
             return templates.TemplateResponse(request, "error.html", {"title": title, "detail": exc.detail},
                                               status_code=exc.status_code)
         return await http_exception_handler(request, exc)
+
+    @app.get("/healthz", include_in_schema=False)
+    def healthz():
+        """For Docker and uptime checks: is the app up and can it reach its database? Shows nothing private."""
+        try:
+            with session_scope() as s:
+                s.execute(text("SELECT 1"))
+        except Exception:  # noqa: BLE001 - any database failure means "not healthy"
+            return JSONResponse({"status": "error", "database": "unreachable"}, status_code=503)
+        return {"status": "ok", "version": __version__}
 
     register_account_routes(app)
     register_schedule_routes(app)

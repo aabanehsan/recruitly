@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import webbrowser
 from importlib import resources
@@ -22,7 +23,11 @@ def serve(host: str, port: int, open_browser: bool) -> None:
     import uvicorn
 
     url = f"http://{'localhost' if host in ('127.0.0.1', '0.0.0.0') else host}:{port}"
-    print(f"\n  Recruitly v{__version__} running at {url}  (Ctrl+C to stop)\n  Data folder: {settings.data_dir}\n")
+    from .services.database import redact_db_url
+
+    db = "SQLite in the data folder" if "RECRUITLY_DB_URL" not in os.environ else redact_db_url(settings.db_url)
+    print(f"\n  Recruitly v{__version__} running at {url}  (Ctrl+C to stop)\n"
+          f"  Data folder: {settings.data_dir}\n  Database: {db}\n")
     if open_browser:
         Timer(1.2, lambda: webbrowser.open(url)).start()
     uvicorn.run("recruitly.app:create_app", factory=True, host=host, port=port, log_level="warning")

@@ -1,0 +1,31 @@
+# Postgres instead of SQLite. Use together with docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml up --build
+#
+# Postgres keeps its files in the `recruitly-postgres` Docker volume (headshots stay in ./data). Set RECRUITLY_DB_PASSWORD (e.g. in a .env file) before the first start.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: recruitly
+      POSTGRES_USER: recruitly
+      POSTGRES_PASSWORD: ${RECRUITLY_DB_PASSWORD:-recruitly}
+    volumes:
+      - recruitly-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recruitly -d recruitly"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  recruitly:
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      RECRUITLY_DB_URL: postgresql://recruitly:${RECRUITLY_DB_PASSWORD:-recruitly}@db:5432/recruitly
+
+volumes:
+  recruitly-postgres:

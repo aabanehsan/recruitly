@@ -11,6 +11,7 @@ from conftest import PASSWORD, csrf_of, login, make_user
 PUBLIC = {
     ("GET", "/login"), ("POST", "/login"), ("GET", "/setup"), ("POST", "/setup"),
     ("GET", "/signup/{token}"), ("POST", "/signup/{token}"), ("POST", "/logout"),
+    ("GET", "/healthz"),
 }
 ANY_MEMBER = {
     ("GET", "/"), ("GET", "/applicants/{applicant_id}"), ("GET", "/headshots/{name}"),

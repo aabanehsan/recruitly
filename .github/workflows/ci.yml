@@ -20,3 +20,63 @@ jobs:
       - name: Demo data loads
         run: |
           python -c "from recruitly.cli import load_demo; load_demo()"
+
+  postgres:
+    # the whole test suite again, against a real Postgres server
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: recruitly
+          POSTGRES_PASSWORD: recruitly
+          POSTGRES_DB: recruitly_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U recruitly"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      RECRUITLY_TEST_DB_URL: postgresql://recruitly:recruitly@localhost:5432/recruitly_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,postgres]"
+      - run: pytest -q
+      - name: Full demo loads into Postgres
+        env:
+          RECRUITLY_DB_URL: postgresql://recruitly:recruitly@localhost:5432/recruitly_demo
+          RECRUITLY_DATA_DIR: ${{ runner.temp }}/demo
+        run: |
+          PGPASSWORD=recruitly psql -h localhost -U recruitly -d recruitly_test -c "CREATE DATABASE recruitly_demo"
+          python -c "
+          from recruitly.cli import create_demo_accounts, load_demo, load_demo_schedule, load_demo_scores, load_demo_votes, load_demo_sync
+          load_demo(); create_demo_accounts(); load_demo_schedule(); load_demo_scores(); load_demo_votes(); load_demo_sync()
+          "
+
+  docker:
+    # build the image and check that `docker compose up` serves the app
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start with docker compose (SQLite)
+        run: |
+          RECRUITLY_MODE=demo docker compose up --build -d
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/healthz && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8000/healthz
+          curl -fsS http://127.0.0.1:8000/login | grep -q "admin@demo.recruitly.dev"
+          test -f data/recruitly.db
+          docker compose down
+      - name: Start with docker compose (Postgres)
+        run: |
+          sudo rm -rf data
+          docker compose -f docker-compose.yml -f docker-compose.postgres.yml up --build -d
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/healthz && break; sleep 2; done
+          curl -fsS http://127.0.0.1:8000/healthz
+          curl -fsSL http://127.0.0.1:8000/ | grep -q "Welcome to Recruitly"
+          test ! -f data/recruitly.db
+          docker compose -f docker-compose.yml -f docker-compose.postgres.yml down -v

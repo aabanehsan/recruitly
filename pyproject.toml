@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "recruitly"
-version = "0.6.0"
+version = "1.0.0"
 description = "Applicant tracking for student org recruitment: import Google Form responses, clean them up, and manage applicant profiles."
 readme = "README.md"
 license = { text = "MIT" }
@@ -25,6 +25,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7"]
+# PostgreSQL support (set RECRUITLY_DB_URL=postgresql://...). The Docker image includes it.
+postgres = ["psycopg[binary]>=3.1"]
 
 [project.scripts]
 recruitly = "recruitly.cli:main"

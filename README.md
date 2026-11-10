@@ -2,13 +2,75 @@
 
 Applicant tracking for student org recruitment. Point it at your Google Form responses, and it builds a clean profile for every applicant, with their headshot, major, year, GPA, links and short answers, in one place your whole exec team can use.
 
-![Applicant board](docs/board.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/board-dark.png">
+  <img alt="Applicant board" src="docs/screenshots/board-light.png">
+</picture>
+
+Runs anywhere Python 3.10+ runs, or with `docker compose up`. SQLite out of the box, Postgres when you want it. Light and dark mode, and it works on phones.
 
 ## Why
 
 Most orgs run recruitment out of a Google Form and a messy spreadsheet. Names come in as `jOHN`, majors as `cs`, `comp sci` and `Computer Science`, phone numbers in five formats, and someone always submits twice. Headshots end up in a Drive folder that nobody can match to the right row. Recruitly fixes all of that on import and gives you a board you can actually run rush from.
 
-## Features (v0.6)
+## Tour
+
+A recruitment cycle in Recruitly, start to finish. Screenshots follow your system's light or dark setting; every screen has both (see [`docs/screenshots/`](docs/screenshots/)).
+
+**1. Import the form.** Upload the Google Form CSV or paste the Sheets link. Recruitly maps the questions to profile fields, cleans every answer (names, majors, emails, phone numbers, GPAs, grad terms), shows you exactly what it changed, and only saves when you confirm. Save the link and **Sync now** picks up new and edited responses later.
+
+**2. Everyone gets a profile.** Headshot, major, year, GPA, links and short answers on one page, with interviews, scores, votes and email drafts alongside.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/profile-dark.png">
+  <img alt="Applicant profile with scores and notes" src="docs/screenshots/profile-light.png">
+</picture>
+
+**3. Schedule interviews.** Add back-to-back slots, book applicants from the schedule or their profile, and export `.ics` files for interviewers' calendars. Double booking is blocked.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/schedule-dark.png">
+  <img alt="Interview schedule grouped by day" src="docs/screenshots/schedule-light.png">
+</picture>
+
+**4. Score against a rubric.** Weighted 1-5 criteria per round, plus notes. Nobody sees anyone else's scores until they've submitted their own, so first impressions don't anchor the room.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/scoring-dark.png">
+  <img alt="Score sheet" src="docs/screenshots/scoring-light.png">
+</picture>
+
+**5. Decide together.** Rank by score, spot split or missing scores, open a yes/no/abstain vote for the debrief, then move people to *Offered* or *Cut* in bulk. A funnel chart shows how the cycle went.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/decisions-dark.png">
+  <img alt="Decisions dashboard with funnel and voting" src="docs/screenshots/decisions-light.png">
+</picture>
+
+**6. Write the emails.** Invite, offer and rejection templates with placeholders turn into a ready-to-send draft per applicant: open it in your email app or copy it. Recruitly never sends anything itself.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/emails-dark.png">
+  <img alt="Per-applicant email drafts" src="docs/screenshots/emails-light.png">
+</picture>
+
+On a phone:
+
+<p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/phone-board-dark.png">
+  <img alt="Board on a phone" src="docs/screenshots/phone-board-light.png" width="260">
+</picture>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/phone-profile-dark.png">
+  <img alt="Profile on a phone" src="docs/screenshots/phone-profile-light.png" width="260">
+</picture>
+</p>
+
+## Features (v1.0)
+
+- **Docker and Postgres.** `docker compose up` runs the whole app with your data in `./data`; add one override file to run it on Postgres instead of SQLite. Any Postgres URL works through `RECRUITLY_DB_URL`, the full test suite runs against Postgres in CI, and `/healthz` reports whether the app and its database are up.
+
 
 - **Live Google Sheets sync.** Save your responses sheet's link once (in **Settings**, or by ticking *Save this link* on the Import page), then hit **Sync now** whenever new responses come in.
   - Sync runs through the same preview as a normal import: new responses are added, people who edited their answers are updated (the preview says exactly which fields changed), and unchanged rows are left alone and hidden from the list. Nothing is saved until you confirm.
@@ -88,6 +150,16 @@ As the admin, open **Settings → Sync now** to see a sync: the demo's sheet lin
 
 Use `python3 run.py` without `demo` to start fresh: the first page asks you to create the admin account, then you invite the rest of your exec team from **Members**.
 
+Prefer Docker? You don't need Python at all:
+
+```bash
+git clone https://github.com/aabanehsan/recruitly
+cd recruitly
+RECRUITLY_MODE=demo docker compose up --build    # or just `docker compose up --build` to start fresh
+```
+
+See [Docker](#docker) below for Postgres and running it for your team.
+
 Prefer to manage the environment yourself?
 
 ```bash
@@ -149,6 +221,44 @@ Past sessions stay listed on the Decisions page and on each applicant's profile.
 
 `{slot_time}`, `{slot_date}`, `{slot_length}` and `{slot_location}` come from the applicant's next booked interview. `{first_name}` uses their preferred name when they gave one.
 
+## Docker
+
+`docker-compose.yml` builds the image and runs Recruitly on http://localhost:8000:
+
+```bash
+docker compose up --build -d     # start in the background
+docker compose logs -f           # see what it's doing
+docker compose down              # stop (your data stays)
+```
+
+- **Your data** (database, headshots, the login signing key) lives in `./data` next to the compose file, the same folder `python3 run.py` uses, so you can switch between the two. Back it up by copying that folder.
+- **Demo data:** `RECRUITLY_MODE=demo docker compose up --build`. The demo logins are printed in the logs and shown on the login page.
+- **Settings** go in a `.env` file next to `docker-compose.yml` (e.g. `RECRUITLY_ORG_NAME="Your Org"`, `RECRUITLY_PORT=8080`). Every variable in [Configuration](#configuration) works.
+- **Commands** run inside the container: `docker compose exec recruitly recruitly reset-password you@utexas.edu`.
+- **Upgrading:** `git pull && docker compose up --build -d`.
+- The port is only published on `127.0.0.1`. To let your team in, put a reverse proxy with HTTPS (Caddy, nginx, Cloudflare Tunnel) in front of it and set `RECRUITLY_SECURE_COOKIES=1`.
+- The container runs as an unprivileged user and has a health check on `/healthz`.
+
+### Postgres
+
+SQLite is plenty for one org's recruitment. If you'd rather use Postgres (or your host only offers that), add the override file, which starts a `postgres:16` container next to Recruitly:
+
+```bash
+echo "RECRUITLY_DB_PASSWORD=pick-a-long-password" >> .env
+docker compose -f docker-compose.yml -f docker-compose.postgres.yml up --build -d
+```
+
+Postgres keeps its data in the `recruitly-postgres` Docker volume; headshots stay in `./data`.
+
+Without Docker, install the driver and point `RECRUITLY_DB_URL` at any Postgres database:
+
+```bash
+pip install -e ".[postgres]"
+RECRUITLY_DB_URL=postgresql://user:password@localhost:5432/recruitly recruitly
+```
+
+`postgres://` URLs (as Render, Railway, Heroku and Supabase give them) work as-is. Tables are created on first start. Recruitly doesn't copy an existing SQLite database into Postgres, so pick one before your cycle starts (or re-import the form, which is quick).
+
 ## Configuration
 
 Set these as environment variables:
@@ -160,15 +270,19 @@ Set these as environment variables:
 | `RECRUITLY_EMAIL_DOMAIN` | none | Warn when an email isn't on this domain, e.g. `utexas.edu` |
 | `RECRUITLY_TIMEZONE` | `America/Chicago` | Time zone interview slots are in, used for calendar export |
 | `RECRUITLY_DATA_DIR` | `./data` | Where the database and headshots live |
-| `RECRUITLY_DB_URL` | SQLite in the data dir | Any SQLAlchemy database URL |
+| `RECRUITLY_DB_URL` | SQLite in the data dir | Database URL: `sqlite:///path.db` or `postgresql://user:password@host:5432/db` |
 | `RECRUITLY_FETCH_HEADSHOTS` | `1` | Set to `0` to skip downloading headshots from Drive links |
 | `RECRUITLY_SECRET_KEY` | generated | Key that signs login cookies. By default one is generated into `data/secret_key` on first run |
 | `RECRUITLY_SECURE_COOKIES` | `0` | Set to `1` when serving over HTTPS so the login cookie is only sent securely |
+| `RECRUITLY_MODE` | `serve` | Docker Compose only: set to `demo` to load the demo data |
+| `RECRUITLY_PORT` | `8000` | Docker Compose only: the port on your machine |
+| `RECRUITLY_DB_PASSWORD` | `recruitly` | Docker Compose with Postgres only: the database password |
 
 ## How it's built
 
 - **FastAPI** + **Jinja** templates, server-rendered with plain CSS and no frontend framework
-- **SQLAlchemy 2.0** with SQLite by default
+- **SQLAlchemy 2.0** with SQLite by default, or PostgreSQL through **psycopg 3**
+- **Docker** image and Compose files; CI runs the tests on Python 3.10-3.13, again against Postgres, and boots the Compose setup
 - **Pillow** for headshot processing
 - **argon2-cffi** for password hashing and Starlette's signed session cookies for logins
 - Cleaning, account, scheduling, scoring, decision, sync and email rules live in `recruitly/services/` as pure functions, so every rule is unit tested. A test checks that every route has an access rule, so a new page can't ship unprotected.
@@ -191,6 +305,7 @@ recruitly/
     scoring.py        rubric parsing, weighted averages, who-sees-whose-scores rules
     decisions.py      ranking, flags, vote tallies and visibility, funnel and chart maths
     sync.py           what changed between syncs, remembered column mappings, "synced 2 hours ago"
+    database.py       database URLs (SQLite, Postgres) and connection settings
     emails.py         placeholders, template checks, drafts and mailto: links
     cleaning.py       header mapping + field validation/cleanup
     importer.py       two-step import: preview, then apply
@@ -199,13 +314,15 @@ recruitly/
   sample_data/        demo form export, a later copy for the sync demo, placeholder headshots
 tests/                pytest suite
 run.py                one-command setup + start
+Dockerfile, docker-compose.yml, docker-compose.postgres.yml
+docs/screenshots/     light and dark screenshots of every main screen
 ```
 
-Run the tests with `pip install -e ".[dev]" && pytest`.
+Run the tests with `pip install -e ".[dev]" && pytest`. To run them against Postgres too: `pip install -e ".[dev,postgres]"` and set `RECRUITLY_TEST_DB_URL=postgresql://user:password@localhost/recruitly_test` (an empty database; every test starts from fresh tables).
 
 ## Roadmap
 
-Next up: Docker, Postgres support and a v1.0 release. See [ROADMAP.md](ROADMAP.md).
+Recruitly 1.0 finishes the original roadmap: import, accounts, scheduling, scoring, decisions, sync and emails, packaged for Docker and Postgres. See [ROADMAP.md](ROADMAP.md) for how it was built, one release at a time. Ideas and bug reports are welcome as GitHub issues.
 
 ## Privacy note
 

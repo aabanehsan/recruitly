@@ -16,9 +16,11 @@ Recruitly ships in small, working releases. Each milestone below is one release:
 
 - [x] **v0.6: Live Google Sheets sync and email templates.** Save the Sheets link in settings and re-sync with one click: new responses are added and changed ones updated, using the existing preview flow. Show "last synced" time. Email templates for interview invites, offers and rejections with placeholders ({first_name}, {slot_time}); generate per-applicant drafts the admin can copy or open as `mailto:` links. No email is sent automatically.
 
+- [x] **v0.7: Docker, polish and release.** `Dockerfile` and `docker-compose.yml` so `docker compose up` runs everything with the data folder as a volume. Postgres support via `RECRUITLY_DB_URL` (tested in CI with a Postgres service). Dark mode screenshot set in `docs/`. Final README pass with a feature tour, and tag `v1.0.0`.
+
 ## Next
 
-- [ ] **v0.7: Docker, polish and release.** `Dockerfile` and `docker-compose.yml` so `docker compose up` runs everything with the data folder as a volume. Postgres support via `RECRUITLY_DB_URL` (tested in CI with a Postgres service). Dark mode screenshot set in `docs/`. Final README pass with a feature tour, and tag `v1.0.0`.
+All milestones are done. Recruitly 1.0 is out; new ideas go in GitHub issues.
 
 ## Guidelines for every milestone
 

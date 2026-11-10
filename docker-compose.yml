@@ -1,0 +1,27 @@
+# Run Recruitly with Docker:
+#
+#   docker compose up --build          start it, open http://localhost:8000
+#   RECRUITLY_MODE=demo docker compose up --build    same, with the demo data and logins
+#
+# Everything (database, headshots, login key) lives in ./data on your machine, so it survives
+# rebuilds and upgrades. For Postgres instead of SQLite, add the override file:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml up --build
+
+services:
+  recruitly:
+    build: .
+    image: recruitly:latest
+    command: ["recruitly", "${RECRUITLY_MODE:-serve}", "--host", "0.0.0.0", "--port", "8000", "--no-browser"]
+    ports:
+      # only reachable from this computer; put a reverse proxy with HTTPS in front to share it with your team
+      - "127.0.0.1:${RECRUITLY_PORT:-8000}:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      RECRUITLY_ORG_NAME: ${RECRUITLY_ORG_NAME:-Recruitly}
+      RECRUITLY_CYCLE: ${RECRUITLY_CYCLE:-Fall Rush}
+      RECRUITLY_TIMEZONE: ${RECRUITLY_TIMEZONE:-America/Chicago}
+      RECRUITLY_EMAIL_DOMAIN: ${RECRUITLY_EMAIL_DOMAIN:-}
+      RECRUITLY_SECURE_COOKIES: ${RECRUITLY_SECURE_COOKIES:-0}
+    restart: unless-stopped
