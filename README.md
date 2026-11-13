@@ -9,6 +9,8 @@ Applicant tracking for student org recruitment. Point it at your Google Form res
 
 Runs anywhere Python 3.10+ runs, or with `docker compose up`. SQLite out of the box, Postgres when you want it. Light and dark mode, and it works on phones.
 
+**[Live demo](https://aabanehsan.github.io/recruitly/)**: click through every page with sample data, no install needed (forms don't save in the demo).
+
 ## Why
 
 Most orgs run recruitment out of a Google Form and a messy spreadsheet. Names come in as `jOHN`, majors as `cs`, `comp sci` and `Computer Science`, phone numbers in five formats, and someone always submits twice. Headshots end up in a Drive folder that nobody can match to the right row. Recruitly fixes all of that on import and gives you a board you can actually run rush from.
